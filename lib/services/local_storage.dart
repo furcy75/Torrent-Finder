@@ -3,13 +3,11 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:safetorrent/models/app_settings.dart';
-import 'package:safetorrent/models/history_item.dart';
 import 'package:safetorrent/models/watchlist_item.dart';
 
 /// 100% on-device local persistence (Android, Windows, Linux — zero server/cloud).
 ///
-/// Stores settings, opt-in search history, and the "À rechercher plus tard" watchlist
-/// in a single private JSON file inside the OS application support directory.
+/// Stores only user settings and the "Plus tard" watchlist (no search history).
 class LocalStorageService {
   LocalStorageService({Directory? overrideDirectory})
       : _overrideDirectory = overrideDirectory;
@@ -17,7 +15,6 @@ class LocalStorageService {
   final Directory? _overrideDirectory;
 
   AppSettings settings = const AppSettings();
-  List<HistoryItem> history = [];
   List<WatchlistItem> watchlist = [];
   bool isLoaded = false;
 
@@ -40,12 +37,6 @@ class LocalStorageService {
       if (decoded['settings'] is Map<String, dynamic>) {
         settings = AppSettings.fromJson(decoded['settings'] as Map<String, dynamic>);
       }
-      if (decoded['history'] is List) {
-        history = (decoded['history'] as List)
-            .whereType<Map<String, dynamic>>()
-            .map(HistoryItem.fromJson)
-            .toList();
-      }
       if (decoded['watchlist'] is List) {
         watchlist = (decoded['watchlist'] as List)
             .whereType<Map<String, dynamic>>()
@@ -63,7 +54,6 @@ class LocalStorageService {
     final file = await _storageFile();
     final payload = {
       'settings': settings.toJson(),
-      'history': history.map((e) => e.toJson()).toList(),
       'watchlist': watchlist.map((e) => e.toJson()).toList(),
     };
     final tmp = File('${file.path}.tmp');
@@ -76,38 +66,10 @@ class LocalStorageService {
     await _save();
   }
 
-  Future<void> addHistory(HistoryItem item) async {
-    if (!settings.saveHistory) return;
-    final cleanQuery = item.query.trim().toLowerCase();
-    if (cleanQuery.isEmpty) return;
-    // Deduplicate identical movie queries so history never accumulates redundant clutter
-    history.removeWhere(
-      (e) => e.query.trim().toLowerCase() == cleanQuery && e.year == item.year,
-    );
-    history.insert(0, item);
-    if (history.length > 50) {
-      history = history.sublist(0, 50);
-    }
-    await _save();
-  }
-
-  Future<void> deleteHistory(String id) async {
-    history.removeWhere((e) => e.id == id);
-    await _save();
-  }
-
-  Future<void> clearHistory() async {
-    history.clear();
-    await _save();
-  }
-
   Future<bool> addToWatchlist(WatchlistItem item) async {
-    final newLangKey = (item.languages.map((l) => l.code).toList()..sort()).join(',');
-    final exists = watchlist.any((e) {
-      final existingKey = (e.languages.map((l) => l.code).toList()..sort()).join(',');
-      return e.titleFr.toLowerCase() == item.titleFr.toLowerCase() &&
-          existingKey == newLangKey;
-    });
+    final exists = watchlist.any(
+      (e) => e.titleFr.toLowerCase() == item.titleFr.toLowerCase(),
+    );
     if (exists) return false;
     watchlist.insert(0, item);
     await _save();

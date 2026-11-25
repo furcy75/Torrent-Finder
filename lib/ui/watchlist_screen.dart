@@ -22,46 +22,30 @@ class WatchlistScreen extends StatefulWidget {
 
 class _WatchlistScreenState extends State<WatchlistScreen> {
   final _titleCtrl = TextEditingController();
-  final _yearCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
-  final Set<LanguageFilter> _selectedLangs = {LanguageFilter.fr};
 
   @override
   void dispose() {
     _titleCtrl.dispose();
-    _yearCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
-  }
-
-  void _toggleLang(LanguageFilter lang) {
-    setState(() {
-      if (_selectedLangs.contains(lang)) {
-        if (_selectedLangs.length > 1) _selectedLangs.remove(lang);
-      } else {
-        _selectedLangs.add(lang);
-      }
-    });
   }
 
   Future<void> _addManual() async {
     final title = _titleCtrl.text.trim();
     if (title.isEmpty) return;
     final notes = _notesCtrl.text.trim();
-    final year = int.tryParse(_yearCtrl.text.trim());
 
     await widget.storage.addToWatchlist(
       WatchlistItem(
         id: '${DateTime.now().microsecondsSinceEpoch}',
         titleFr: title,
-        languages: _selectedLangs.toList(),
-        year: year,
+        languages: const [LanguageFilter.all],
         notes: notes.isNotEmpty ? notes : null,
         createdAt: DateTime.now().toUtc(),
       ),
     );
     _titleCtrl.clear();
-    _yearCtrl.clear();
     _notesCtrl.clear();
     setState(() {});
     widget.onDataChanged();
@@ -91,48 +75,13 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: TextField(
-                            controller: _titleCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Ajouter un film à surveiller',
-                              isDense: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          width: 92,
-                          child: TextField(
-                            controller: _yearCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Année',
-                              isDense: true,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        ...LanguageFilter.selectableFlags.map(
-                          (lang) => FilterChip(
-                            selected: _selectedLangs.contains(lang),
-                            onSelected: (_) => _toggleLang(lang),
-                            label: Text('${lang.flag} ${lang.code.toUpperCase()}'),
-                          ),
-                        ),
-                      ],
+                    TextField(
+                      controller: _titleCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Ajouter un film à surveiller',
+                        isDense: true,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -196,10 +145,14 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                     ),
                     subtitle: Text(
                       [
-                        LanguageFilter.formatFlags(item.languages),
                         if (item.titleOriginal != null) 'VO : ${item.titleOriginal}',
                         if (item.notes != null) 'Note : ${item.notes}',
-                      ].join(' • '),
+                      ].join(' • ').isNotEmpty
+                          ? [
+                              if (item.titleOriginal != null) 'VO : ${item.titleOriginal}',
+                              if (item.notes != null) 'Note : ${item.notes}',
+                            ].join(' • ')
+                          : 'Prêt à relancer la recherche',
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -212,7 +165,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                               query: item.titleFr,
                               originalTitle: item.titleOriginal,
                               year: item.year,
-                              languages: item.languages,
                               watchlistId: item.id,
                             ),
                           ),

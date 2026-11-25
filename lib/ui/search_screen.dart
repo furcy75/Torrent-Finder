@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:safetorrent/models/history_item.dart';
 import 'package:safetorrent/models/movie_suggestion.dart';
 import 'package:safetorrent/models/torrent_result.dart';
 import 'package:safetorrent/models/watchlist_item.dart';
@@ -11,6 +10,7 @@ import 'package:safetorrent/services/release_parser.dart';
 import 'package:safetorrent/ui/home_shell.dart';
 import 'package:safetorrent/ui/nfo_dialog.dart';
 import 'package:safetorrent/ui/sandbox_dialog.dart';
+import 'package:safetorrent/ui/widgets/country_flag.dart';
 
 enum _SortMode { seeders, quality, sizeDesc, sizeAsc }
 
@@ -36,7 +36,6 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final _movieCtrl = TextEditingController();
-  final _yearCtrl = TextEditingController();
   final _movieFocus = FocusNode();
 
   final _allocineService = AllocineService();
@@ -44,14 +43,12 @@ class _SearchScreenState extends State<SearchScreen> {
 
   _SearchStage _stage = _SearchStage.input;
 
-  // Multi-language selection (can combine FR + EN + ES simultaneously)
-  final Set<LanguageFilter> _selectedLangs = {LanguageFilter.fr};
-
   // Selected movie from step 2 (AlloCiné / Wikidata / IMDb) and active title choices
   MovieSuggestion? _selectedMovie;
   final Set<String> _activeSearchTitles = {};
 
-  // Quick filter tags applied live to search results (CAM/TS excluded by default!)
+  // Quick filter tags organized by category rows (CAM/TS excluded by default)
+  final Set<String> _langResultFilters = {}; // 'FR', 'EN', 'ES', 'MULTI'
   bool _onlyActiveSeeders = false;
   bool _minTenSeeders = false;
   bool _excludeCam = true;
@@ -78,10 +75,6 @@ class _SearchScreenState extends State<SearchScreen> {
       _lastHandledTrigger = widget.triggerId;
       final req = widget.pendingRequest!;
       _movieCtrl.text = req.query;
-      _yearCtrl.text = req.year?.toString() ?? '';
-      _selectedLangs
-        ..clear()
-        ..addAll(req.languages.isEmpty ? [LanguageFilter.fr] : req.languages);
       _selectedMovie = MovieSuggestion(
         titleFr: req.query,
         titleOriginal: (req.originalTitle ?? '').trim().isNotEmpty
@@ -104,38 +97,14 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _movieCtrl.dispose();
-    _yearCtrl.dispose();
     _movieFocus.dispose();
     super.dispose();
-  }
-
-  bool get _allLangsSelected => _selectedLangs.length >= LanguageFilter.selectableFlags.length;
-
-  void _toggleLanguage(LanguageFilter lang) {
-    setState(() {
-      if (_selectedLangs.contains(lang)) {
-        if (_selectedLangs.length > 1) {
-          _selectedLangs.remove(lang);
-        }
-      } else {
-        _selectedLangs.add(lang);
-      }
-    });
-  }
-
-  void _selectAllLanguages() {
-    setState(() {
-      _selectedLangs
-        ..clear()
-        ..addAll(LanguageFilter.selectableFlags);
-    });
   }
 
   /// Complete reset to start a brand-new search from scratch.
   void _resetAllToZero() {
     setState(() {
       _movieCtrl.clear();
-      _yearCtrl.clear();
       _stage = _SearchStage.input;
       _selectedMovie = null;
       _activeSearchTitles.clear();
@@ -147,6 +116,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _searchingTorrents = false;
       _hasSearchedTorrents = false;
       // Restore default filter tags (Exclure CAM/TS active by default)
+      _langResultFilters.clear();
       _onlyActiveSeeders = false;
       _minTenSeeders = false;
       _excludeCam = true;
@@ -159,6 +129,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   bool get _hasAnyTagFilters =>
+      _langResultFilters.isNotEmpty ||
       _onlyActiveSeeders ||
       _minTenSeeders ||
       _excludeCam ||
@@ -168,6 +139,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _clearAllTagFilters() {
     setState(() {
+      _langResultFilters.clear();
       _onlyActiveSeeders = false;
       _minTenSeeders = false;
       _excludeCam = false;
@@ -188,7 +160,6 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
     FocusScope.of(context).unfocus();
-    final year = int.tryParse(_yearCtrl.text.trim());
 
     setState(() {
       _loadingTitles = true;
@@ -199,7 +170,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _hasSearchedTorrents = false;
     });
 
-    final hits = await _allocineService.resolveMovieTitles(query, year: year);
+    final hits = await _allocineService.resolveMovieTitles(query);
     if (!mounted) return;
     setState(() {
       _loadingTitles = false;
@@ -215,7 +186,6 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() {
       _selectedMovie = movie;
       _movieCtrl.text = movie.titleFr;
-      if (movie.year != null) _yearCtrl.text = '${movie.year}';
       _activeSearchTitles
         ..clear()
         ..addAll(titles);
@@ -235,20 +205,18 @@ class _SearchScreenState extends State<SearchScreen> {
       _showSnack('Saisissez d\'abord le nom d\'un film.');
       return;
     }
-    final year = int.tryParse(_yearCtrl.text.trim());
     final manual = MovieSuggestion(
       titleFr: query,
       titleOriginal: query,
-      year: year,
       source: 'Recherche directe',
     );
     _selectMovieAndSearch(manual, autoLaunchTorrents: true);
   }
 
   // -------------------------------------------------------------------
-  // Step 3: Execute torrent search with selected titles, year, & flags
+  // Step 3: Execute torrent search with selected titles (all languages)
   // -------------------------------------------------------------------
-  Future<void> _performTorrentSearch({bool includeAllLanguages = false}) async {
+  Future<void> _performTorrentSearch() async {
     final activeList = _activeSearchTitles.toList();
     final primaryQuery = activeList.isNotEmpty ? activeList.first : _movieCtrl.text.trim();
     if (primaryQuery.isEmpty) {
@@ -257,10 +225,6 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     FocusScope.of(context).unfocus();
-    final year = _selectedMovie?.year ?? int.tryParse(_yearCtrl.text.trim());
-    final langs = includeAllLanguages
-        ? LanguageFilter.selectableFlags.toSet()
-        : Set<LanguageFilter>.from(_selectedLangs);
 
     setState(() {
       _searchingTorrents = true;
@@ -272,26 +236,10 @@ class _SearchScreenState extends State<SearchScreen> {
     final summary = await _indexersService.search(
       query: primaryQuery,
       extraTitles: activeList.skip(1).toList(),
-      languages: langs,
-      year: year,
-      includeAllLanguages: includeAllLanguages,
+      year: _selectedMovie?.year,
+      includeAllLanguages: true,
       settings: widget.storage.settings,
     );
-
-    // Only store history if user explicitly enabled it (disabled by default to avoid clutter)
-    if (widget.storage.settings.saveHistory) {
-      await widget.storage.addHistory(
-        HistoryItem(
-          id: '${DateTime.now().microsecondsSinceEpoch}',
-          query: _selectedMovie?.titleFr ?? primaryQuery,
-          originalTitle: _selectedMovie?.titleEn ?? _selectedMovie?.titleOriginal,
-          year: year,
-          languages: langs.toList(),
-          resultCount: summary.results.length,
-          createdAt: DateTime.now().toUtc(),
-        ),
-      );
-    }
 
     if (_activeWatchlistId != null) {
       final idx = widget.storage.watchlist.indexWhere((e) => e.id == _activeWatchlistId);
@@ -328,15 +276,14 @@ class _SearchScreenState extends State<SearchScreen> {
                 _selectedMovie!.titleOriginal.toLowerCase() != titleFr.toLowerCase()
             ? _selectedMovie!.titleOriginal
             : null);
-    final year = _selectedMovie?.year ?? int.tryParse(_yearCtrl.text.trim());
 
     final added = await widget.storage.addToWatchlist(
       WatchlistItem(
         id: '${DateTime.now().microsecondsSinceEpoch}',
         titleFr: titleFr,
         titleOriginal: titleOrig,
-        languages: _selectedLangs.toList(),
-        year: year,
+        languages: const [LanguageFilter.all],
+        year: _selectedMovie?.year,
         createdAt: DateTime.now().toUtc(),
       ),
     );
@@ -349,6 +296,20 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   bool _matchesTagFilters(TorrentResult item) {
+    if (_langResultFilters.isNotEmpty) {
+      final detected = item.detectedLanguages.map((e) => e.toUpperCase()).toSet();
+      final matchedLang = _langResultFilters.any((req) {
+        if (req == 'MULTI') return detected.contains('MULTI');
+        if (detected.contains('MULTI')) return true;
+        if (detected.contains(req)) return true;
+        if (req == 'EN' && !detected.contains('FR') && !detected.contains('ES')) {
+          return true;
+        }
+        return false;
+      });
+      if (!matchedLang) return false;
+    }
+
     if (_onlyActiveSeeders && item.seeders <= 0) return false;
     if (_minTenSeeders && item.seeders < 10) return false;
 
@@ -411,17 +372,17 @@ class _SearchScreenState extends State<SearchScreen> {
     return list;
   }
 
-  static String _flagForLangCode(String code) {
+  static String _labelForLangCode(String code) {
     return switch (code.toUpperCase()) {
-      'FR' => '🇫🇷 FR',
-      'EN' => '🇬🇧 EN',
-      'ES' => '🇪🇸 ES',
-      'MULTI' => '🌍 MULTI',
-      'DE' => '🇩🇪 DE',
-      'IT' => '🇮🇹 IT',
-      'PT' => '🇵🇹 PT',
-      'JA' || 'JP' => '🇯🇵 JP',
-      _ => '🗣️ ${code.toUpperCase()}',
+      'FR' => 'Français',
+      'EN' => 'English',
+      'ES' => 'Español',
+      'MULTI' => 'MULTI',
+      'DE' => 'Deutsch',
+      'IT' => 'Italiano',
+      'PT' => 'Português',
+      'JA' || 'JP' => 'Japonais',
+      _ => code.toUpperCase(),
     };
   }
 
@@ -456,7 +417,6 @@ class _SearchScreenState extends State<SearchScreen> {
     final visibleResults = _filteredAndSortedResults;
     final canReset = _stage != _SearchStage.input ||
         _movieCtrl.text.isNotEmpty ||
-        _yearCtrl.text.isNotEmpty ||
         _selectedMovie != null ||
         _results.isNotEmpty;
 
@@ -474,9 +434,21 @@ class _SearchScreenState extends State<SearchScreen> {
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      _stepPill('1. Film', active: _stage == _SearchStage.input, done: _stage != _SearchStage.input),
-                      _stepPill('2. Correspondance', active: _stage == _SearchStage.pickMovie, done: _stage == _SearchStage.results),
-                      _stepPill('3. Torrents', active: _stage == _SearchStage.results, done: false),
+                      _stepPill(
+                        '1. Film',
+                        active: _stage == _SearchStage.input,
+                        done: _stage != _SearchStage.input,
+                      ),
+                      _stepPill(
+                        '2. Correspondance',
+                        active: _stage == _SearchStage.pickMovie,
+                        done: _stage == _SearchStage.results,
+                      ),
+                      _stepPill(
+                        '3. Torrents',
+                        active: _stage == _SearchStage.results,
+                        done: false,
+                      ),
                     ],
                   ),
                 ),
@@ -490,73 +462,24 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
             const SizedBox(height: 12),
 
-            // STEP 1: Movie input card
+            // STEP 1: Clean title-only search card (no year, no language selector)
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 4,
-                          child: TextField(
-                            controller: _movieCtrl,
-                            focusNode: _movieFocus,
-                            textInputAction: TextInputAction.search,
-                            onSubmitted: (_) => _identifyMovie(),
-                            onChanged: (_) => setState(() {}),
-                            decoration: const InputDecoration(
-                              labelText: 'Nom du film',
-                              hintText: 'Ex : Les Évadés, Dune, Inception...',
-                              prefixIcon: Icon(Icons.movie_outlined),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        SizedBox(
-                          width: 102,
-                          child: TextField(
-                            controller: _yearCtrl,
-                            keyboardType: TextInputType.number,
-                            textInputAction: TextInputAction.search,
-                            onSubmitted: (_) => _identifyMovie(),
-                            decoration: const InputDecoration(
-                              labelText: 'Année',
-                              hintText: '2024',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Langues voulues (plusieurs choix possibles) :',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        ...LanguageFilter.selectableFlags.map((lang) {
-                          final selected = _selectedLangs.contains(lang);
-                          return FilterChip(
-                            selected: selected,
-                            onSelected: (_) => _toggleLanguage(lang),
-                            label: Text('${lang.flag} ${lang.label}'),
-                          );
-                        }),
-                        ActionChip(
-                          avatar: Icon(
-                            _allLangsSelected ? Icons.check_circle : Icons.public,
-                            size: 16,
-                          ),
-                          label: const Text('🌍 Toutes'),
-                          onPressed: _selectAllLanguages,
-                        ),
-                      ],
+                    TextField(
+                      controller: _movieCtrl,
+                      focusNode: _movieFocus,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (_) => _identifyMovie(),
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(
+                        labelText: 'Nom du film',
+                        hintText: 'Ex : Les Évadés, Dune, Inception...',
+                        prefixIcon: Icon(Icons.movie_outlined),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Wrap(
@@ -598,7 +521,7 @@ class _SearchScreenState extends State<SearchScreen> {
             ],
 
             if (_stage == _SearchStage.results && _results.isNotEmpty) ...[
-              _buildFilterTagsCard(visibleResults.length),
+              _buildCategorizedFiltersCard(visibleResults.length),
               const SizedBox(height: 12),
             ],
 
@@ -610,7 +533,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     children: [
                       CircularProgressIndicator(),
                       SizedBox(height: 12),
-                      Text('Recherche des torrents en cours...'),
+                      Text('Recherche des torrents sur les indexeurs sans pub...'),
                     ],
                   ),
                 ),
@@ -624,13 +547,13 @@ class _SearchScreenState extends State<SearchScreen> {
                       const Icon(Icons.movie_filter_outlined, size: 44, color: Color(0xFF94A3B8)),
                       const SizedBox(height: 10),
                       const Text(
-                        'Aucun torrent trouvé dans ces langues',
+                        'Aucun torrent trouvé pour ce film',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'Sauvegardez ce film dans « Plus tard » pour y retourner facilement, élargissez à toutes les langues ou lancez une nouvelle recherche.',
+                        'Sauvegardez ce film dans « Plus tard » pour y retourner facilement, ou lancez une nouvelle recherche.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Color(0xFF94A3B8)),
                       ),
@@ -644,11 +567,6 @@ class _SearchScreenState extends State<SearchScreen> {
                             onPressed: _saveForLater,
                             icon: const Icon(Icons.bookmark_add_outlined),
                             label: const Text('Sauvegarder pour plus tard'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () => _performTorrentSearch(includeAllLanguages: true),
-                            icon: const Icon(Icons.public),
-                            label: const Text('Essayer toutes langues'),
                           ),
                           OutlinedButton.icon(
                             onPressed: _resetAllToZero,
@@ -672,7 +590,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       const Icon(Icons.filter_alt_off_outlined, size: 40, color: Color(0xFF94A3B8)),
                       const SizedBox(height: 8),
                       Text(
-                        'Aucun des ${_results.length} torrent(s) ne correspond aux tags actifs'
+                        'Aucun des ${_results.length} torrent(s) ne correspond aux filtres actifs'
                         '${_excludeCam ? ' (CAM/TS exclus par défaut)' : ''}.',
                         textAlign: TextAlign.center,
                       ),
@@ -685,7 +603,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           FilledButton.icon(
                             onPressed: _clearAllTagFilters,
                             icon: const Icon(Icons.restart_alt),
-                            label: const Text('Afficher tous les résultats'),
+                            label: const Text('Tout afficher'),
                           ),
                           OutlinedButton.icon(
                             onPressed: _saveForLater,
@@ -891,6 +809,24 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  Widget _flagPill(String langCode, String text, Color bg, Color fg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CountryFlag(code: langCode, width: 17, height: 12),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(color: fg, fontSize: 11.5, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSuggestionCard(MovieSuggestion s) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -926,18 +862,18 @@ class _SearchScreenState extends State<SearchScreen> {
                 const SizedBox(height: 6),
                 Wrap(
                   spacing: 6,
-                  runSpacing: 4,
+                  runSpacing: 5,
                   children: [
-                    _pill('🇫🇷 ${s.titleFr}', const Color(0xFF172542), const Color(0xFFE2E8F0)),
+                    _flagPill('FR', 'FR : ${s.titleFr}', const Color(0xFF172542), const Color(0xFFE2E8F0)),
                     if (s.titleEn != null && s.titleEn!.isNotEmpty)
-                      _pill('🇬🇧 ${s.titleEn}', const Color(0xFF172542), const Color(0xFF7DD3FC)),
+                      _flagPill('EN', 'EN : ${s.titleEn}', const Color(0xFF172542), const Color(0xFF7DD3FC)),
                     if (s.titleEs != null && s.titleEs!.isNotEmpty)
-                      _pill('🇪🇸 ${s.titleEs}', const Color(0xFF172542), const Color(0xFFFCD34D)),
+                      _flagPill('ES', 'ES : ${s.titleEs}', const Color(0xFF172542), const Color(0xFFFCD34D)),
                     if (s.titleOriginal.toLowerCase() != s.titleFr.toLowerCase() &&
                         s.titleOriginal.toLowerCase() != (s.titleEn ?? '').toLowerCase() &&
                         s.titleOriginal.toLowerCase() != (s.titleEs ?? '').toLowerCase())
                       _pill(
-                        '🎬 VO : ${s.titleOriginal}',
+                        'VO : ${s.titleOriginal}',
                         const Color(0xFF172542),
                         const Color(0xFFD8B4FE),
                       ),
@@ -978,12 +914,12 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildSelectedMovieBanner(MovieSuggestion movie) {
     final allTitles = movie.allDistinctTitles;
-    String labelForTitle(String t) {
+    String? flagCodeForTitle(String t) {
       final low = t.toLowerCase();
-      if (low == movie.titleFr.toLowerCase()) return '🇫🇷 $t';
-      if (movie.titleEn != null && low == movie.titleEn!.toLowerCase()) return '🇬🇧 $t';
-      if (movie.titleEs != null && low == movie.titleEs!.toLowerCase()) return '🇪🇸 $t';
-      return '🎬 $t';
+      if (low == movie.titleFr.toLowerCase()) return 'FR';
+      if (movie.titleEn != null && low == movie.titleEn!.toLowerCase()) return 'EN';
+      if (movie.titleEs != null && low == movie.titleEs!.toLowerCase()) return 'ES';
+      return null;
     }
 
     return Card(
@@ -1025,6 +961,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     runSpacing: 6,
                     children: allTitles.map((t) {
                       final selected = _activeSearchTitles.contains(t);
+                      final code = flagCodeForTitle(t);
                       return FilterChip(
                         selected: selected,
                         onSelected: (v) {
@@ -1036,7 +973,16 @@ class _SearchScreenState extends State<SearchScreen> {
                             }
                           });
                         },
-                        label: Text(labelForTitle(t), style: const TextStyle(fontSize: 12)),
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (code != null) ...[
+                              CountryFlag(code: code, width: 17, height: 12),
+                              const SizedBox(width: 6),
+                            ],
+                            Text(t, style: const TextStyle(fontSize: 12)),
+                          ],
+                        ),
                       );
                     }).toList(),
                   ),
@@ -1046,7 +992,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     runSpacing: 8,
                     children: [
                       FilledButton.icon(
-                        onPressed: _searchingTorrents ? null : () => _performTorrentSearch(),
+                        onPressed: _searchingTorrents ? null : _performTorrentSearch,
                         icon: const Icon(Icons.search, size: 17),
                         label: Text(
                           _hasSearchedTorrents
@@ -1070,10 +1016,40 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildFilterTagsCard(int visibleCount) {
+  /// Quick filters organized cleanly in horizontal rows grouped by category.
+  Widget _buildCategorizedFiltersCard(int visibleCount) {
+    Widget categoryRow(String title, List<Widget> chips) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 112,
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: chips,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1097,71 +1073,96 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
               ],
             ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                // Seeders tags
+            const SizedBox(height: 10),
+            categoryRow('Langues', [
+              for (final entry in const [
+                ('FR', 'Français'),
+                ('EN', 'English'),
+                ('ES', 'Español'),
+                ('MULTI', 'MULTI'),
+              ])
                 FilterChip(
-                  selected: _onlyActiveSeeders,
-                  onSelected: (v) => setState(() => _onlyActiveSeeders = v),
-                  label: const Text('▲ Seeders actifs', style: TextStyle(fontSize: 12)),
+                  selected: _langResultFilters.contains(entry.$1),
+                  onSelected: (v) => setState(() {
+                    if (v) {
+                      _langResultFilters.add(entry.$1);
+                    } else {
+                      _langResultFilters.remove(entry.$1);
+                    }
+                  }),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CountryFlag(code: entry.$1, width: 17, height: 12),
+                      const SizedBox(width: 6),
+                      Text(entry.$2, style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
                 ),
+            ]),
+            categoryRow('Disponibilité', [
+              FilterChip(
+                selected: _onlyActiveSeeders,
+                onSelected: (v) => setState(() => _onlyActiveSeeders = v),
+                label: const Text('▲ Seeders actifs', style: TextStyle(fontSize: 12)),
+              ),
+              FilterChip(
+                selected: _minTenSeeders,
+                onSelected: (v) => setState(() => _minTenSeeders = v),
+                label: const Text('🔥 ≥ 10 seeders', style: TextStyle(fontSize: 12)),
+              ),
+            ]),
+            categoryRow('Taille max', [
+              for (final gb in [2, 5, 10])
                 FilterChip(
-                  selected: _minTenSeeders,
-                  onSelected: (v) => setState(() => _minTenSeeders = v),
-                  label: const Text('🔥 ≥ 10 seeders', style: TextStyle(fontSize: 12)),
+                  selected: _maxSizeGb == gb,
+                  onSelected: (v) => setState(() => _maxSizeGb = v ? gb : null),
+                  label: Text('< $gb Go', style: const TextStyle(fontSize: 12)),
                 ),
-                // Size limit tags
-                for (final gb in [2, 5, 10])
-                  FilterChip(
-                    selected: _maxSizeGb == gb,
-                    onSelected: (v) => setState(() => _maxSizeGb = v ? gb : null),
-                    label: Text('< $gb Go', style: const TextStyle(fontSize: 12)),
-                  ),
-                // Resolution tags
-                for (final res in ['4K', '1080p', '720p'])
-                  FilterChip(
-                    selected: _resolutionFilters.contains(res),
-                    onSelected: (v) => setState(() {
-                      if (v) {
-                        _resolutionFilters.add(res);
-                      } else {
-                        _resolutionFilters.remove(res);
-                      }
-                    }),
-                    label: Text(res, style: const TextStyle(fontSize: 12)),
-                  ),
-                // Source / Codec tags (including H.264 / x264)
-                for (final fmt in [
-                  'BluRay',
-                  'WEB-DL',
-                  'WEBRip',
-                  'HDRip',
-                  'H.264 / x264',
-                  'x265',
-                  'HDR',
-                ])
-                  FilterChip(
-                    selected: _formatFilters.contains(fmt),
-                    onSelected: (v) => setState(() {
-                      if (v) {
-                        _formatFilters.add(fmt);
-                      } else {
-                        _formatFilters.remove(fmt);
-                      }
-                    }),
-                    label: Text(fmt, style: const TextStyle(fontSize: 12)),
-                  ),
-                // Excluded by default
+            ]),
+            categoryRow('Résolution', [
+              for (final res in ['4K', '1080p', '720p'])
                 FilterChip(
-                  selected: _excludeCam,
-                  onSelected: (v) => setState(() => _excludeCam = v),
-                  label: const Text('🚫 Sans CAM/TS', style: TextStyle(fontSize: 12)),
+                  selected: _resolutionFilters.contains(res),
+                  onSelected: (v) => setState(() {
+                    if (v) {
+                      _resolutionFilters.add(res);
+                    } else {
+                      _resolutionFilters.remove(res);
+                    }
+                  }),
+                  label: Text(res, style: const TextStyle(fontSize: 12)),
                 ),
-              ],
-            ),
+            ]),
+            categoryRow('Source & Codec', [
+              for (final fmt in [
+                'BluRay',
+                'WEB-DL',
+                'WEBRip',
+                'HDRip',
+                'H.264 / x264',
+                'x265',
+                'HDR',
+              ])
+                FilterChip(
+                  selected: _formatFilters.contains(fmt),
+                  onSelected: (v) => setState(() {
+                    if (v) {
+                      _formatFilters.add(fmt);
+                    } else {
+                      _formatFilters.remove(fmt);
+                    }
+                  }),
+                  label: Text(fmt, style: const TextStyle(fontSize: 12)),
+                ),
+            ]),
+            categoryRow('Qualité', [
+              FilterChip(
+                selected: _excludeCam,
+                onSelected: (v) => setState(() => _excludeCam = v),
+                label: const Text('🚫 Sans CAM/TS', style: TextStyle(fontSize: 12)),
+              ),
+            ]),
           ],
         ),
       ),
@@ -1199,10 +1200,11 @@ class _SearchScreenState extends State<SearchScreen> {
                   is4k ? const Color(0xFF4C1D95) : const Color(0xFF0C4A6E),
                   is4k ? const Color(0xFFD8B4FE) : const Color(0xFF7DD3FC),
                 ),
-                // Language badges WITH flags directly on every torrent result
+                // Color vector CountryFlag image + language label directly on every torrent result
                 ...item.detectedLanguages.map(
-                  (l) => _pill(
-                    _flagForLangCode(l),
+                  (l) => _flagPill(
+                    l,
+                    _labelForLangCode(l),
                     const Color(0xFF14532D),
                     const Color(0xFF86EFAC),
                   ),

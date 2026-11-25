@@ -19,12 +19,19 @@ class SearchSummary {
 }
 
 /// Parallel on-device torrent search aggregator (pure HTTP JSON/XML — zero ads, zero JS).
-/// Supports multi-language selection (`FR` + `EN` + `ES`), multiple localized titles,
-/// optional release year filtering, and NFO metadata references.
+///
+/// Built-in ad-free sources:
+/// 1. YTS (JSON API — direct `.torrent` URLs)
+/// 2. APIBay (JSON API — real NFO via `t.php`)
+/// 3. Knaben (JSON API — multi-tracker aggregator: 1337x, TPB, TGx, RuTracker...)
+/// 4. TorrentCSV (open-source JSON API)
+/// 5. SolidTorrents (JSON API)
+/// 6. Internet Archive (JSON API — public domain classics + `.torrent` / `.nfo`)
+/// 7. Optional Torznab XML (Jackett / Prowlarr)
 class IndexersService {
   static const Duration _timeout = Duration(seconds: 12);
   static const Map<String, String> _headers = {
-    'User-Agent': 'SafeTorrent/1.1 (Standalone)',
+    'User-Agent': 'SafeTorrent/1.3 (Standalone)',
   };
 
   static const List<String> _publicTrackers = [
@@ -45,9 +52,9 @@ class IndexersService {
   Future<SearchSummary> search({
     required String query,
     List<String> extraTitles = const [],
-    required Set<LanguageFilter> languages,
+    Set<LanguageFilter> languages = const {LanguageFilter.all},
     int? year,
-    bool includeAllLanguages = false,
+    bool includeAllLanguages = true,
     required AppSettings settings,
   }) async {
     final seenQ = <String>{};
@@ -73,6 +80,18 @@ class IndexersService {
     if (settings.enableApibay) {
       queriedNames.add('APIBay');
       tasks.add(_safeRun('APIBay', () => _searchApibay(queries, effectiveLangs, year)));
+    }
+    if (settings.enableKnaben) {
+      queriedNames.add('Knaben');
+      tasks.add(_safeRun('Knaben', () => _searchKnaben(queries, effectiveLangs)));
+    }
+    if (settings.enableTorrentCsv) {
+      queriedNames.add('TorrentCSV');
+      tasks.add(_safeRun('TorrentCSV', () => _searchTorrentCsv(queries, effectiveLangs)));
+    }
+    if (settings.enableSolidTorrents) {
+      queriedNames.add('SolidTorrents');
+      tasks.add(_safeRun('SolidTorrents', () => _searchSolidTorrents(queries, effectiveLangs)));
     }
     if (settings.enableArchiveOrg) {
       queriedNames.add('Internet Archive');
@@ -111,22 +130,11 @@ class IndexersService {
       }
     }
 
-    var results = deduped.values.toList();
-    final filterAll = includeAllLanguages ||
-        effectiveLangs.contains(LanguageFilter.all) ||
-        effectiveLangs.length >= LanguageFilter.selectableFlags.length;
-    if (!filterAll) {
-      final matched = results.where((r) => r.languageMatch).toList();
-      if (matched.isNotEmpty) {
-        results = matched;
-      }
-    }
-
+    final results = deduped.values.toList();
     results.sort((a, b) {
       final aOk = a.preScanStatus == SafetyStatus.blocked ? 0 : 1;
       final bOk = b.preScanStatus == SafetyStatus.blocked ? 0 : 1;
       if (aOk != bOk) return bOk.compareTo(aOk);
-      if (a.languageMatch != b.languageMatch) return b.languageMatch ? 1 : -1;
       if (a.seeders != b.seeders) return b.seeders.compareTo(a.seeders);
       return ReleaseParser.qualityRank(b.quality).compareTo(ReleaseParser.qualityRank(a.quality));
     });
@@ -267,11 +275,11 @@ class IndexersService {
     Set<LanguageFilter> languages,
     int? year,
   ) async {
-    final terms = _expandApibayQueries(queries, languages, year);
+    final terms = _expandMultiTitleQueries(queries, year);
     final out = <TorrentResult>[];
     final seen = <String>{};
 
-    for (final term in terms.take(5)) {
+    for (final term in terms.take(4)) {
       try {
         final uri = Uri.https('apibay.org', '/q.php', {'q': term, 'cat': '200'});
         final resp = await http.get(uri, headers: _headers).timeout(_timeout);
@@ -320,40 +328,232 @@ class IndexersService {
     return out;
   }
 
-  List<String> _expandApibayQueries(
+  // -------------------------------------------------------------------
+  // 3. Knaben JSON API (Aggregates 1337x, TPB, TGx, RuTracker, LimeTorrents...)
+  // -------------------------------------------------------------------
+  Future<List<TorrentResult>> _searchKnaben(
     List<String> queries,
     Set<LanguageFilter> languages,
-    int? year,
-  ) {
-    if (queries.isEmpty) return [];
-    final primary = queries.first;
-    final alt = queries.length > 1 ? queries[1] : null;
-    final suffix = year != null ? ' $year' : '';
-    final raw = <String>[];
-
-    final wantAll = languages.contains(LanguageFilter.all);
-    if (wantAll || languages.contains(LanguageFilter.fr)) {
-      raw.add('$primary FRENCH');
-      if (alt != null) raw.add('$alt FRENCH');
-    }
-    if (wantAll || languages.contains(LanguageFilter.es)) {
-      raw.add('$primary SPANISH');
-      if (alt != null) raw.add('$alt CASTELLANO');
-    }
-    if (wantAll || languages.contains(LanguageFilter.en)) {
-      raw.add('${alt ?? primary}$suffix');
-    }
-    raw.add('$primary$suffix');
-    for (final q in queries.skip(1)) {
-      raw.add('$q$suffix');
-    }
-
+  ) async {
+    final out = <TorrentResult>[];
     final seen = <String>{};
-    return raw.where((t) => seen.add(t.toLowerCase().trim())).toList();
+    final uri = Uri.parse('https://api.knaben.org/v1');
+
+    for (final q in queries.take(3)) {
+      try {
+        final body = jsonEncode({
+          'search_type': '100%',
+          'search_field': 'title',
+          'query': q,
+          'order_by': 'seeders',
+          'order_direction': 'desc',
+          'categories': [2000000], // Movies
+          'from': 0,
+          'size': 35,
+          'hide_unsafe': true,
+          'hide_xxx': true,
+        });
+        final resp = await http
+            .post(
+              uri,
+              headers: {
+                ..._headers,
+                'Content-Type': 'application/json',
+              },
+              body: body,
+            )
+            .timeout(_timeout);
+        if (resp.statusCode != 200) continue;
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        final hits = (data['hits'] as List? ?? []).whereType<Map<String, dynamic>>();
+
+        for (final hit in hits) {
+          final title = (hit['title'] ?? '').toString().trim();
+          if (title.isEmpty) continue;
+          final rawHash = (hit['hash'] ?? '').toString().trim().toUpperCase();
+          final magnet = hit['magnetUrl']?.toString();
+          final hash = rawHash.length == 40 ? rawHash : _extractHashFromMagnet(magnet);
+          final uid = hash ?? 'knaben-${title.hashCode.abs()}';
+          if (!seen.add(uid)) continue;
+
+          final sizeBytes = (hit['bytes'] as num?)?.toInt() ?? 0;
+          final seeders = (hit['seeders'] as num?)?.toInt() ?? 0;
+          final leechers = (hit['peers'] as num?)?.toInt() ?? 0;
+          final origin = (hit['cachedOrigin'] ?? 'Knaben').toString();
+          final link = hit['link']?.toString();
+          final torrentUrl =
+              link != null && link.startsWith('http') && link.toLowerCase().contains('.torrent')
+                  ? link
+                  : null;
+
+          final (quality, tags) = ReleaseParser.parseQuality(title);
+          final langs = ReleaseParser.detectLanguages(title);
+          final (preStatus, preWarn) = ReleaseParser.preScanTitle(title, sizeBytes, seeders);
+
+          out.add(
+            TorrentResult(
+              id: 'kn-${uid.substring(0, uid.length >= 12 ? 12 : uid.length).toLowerCase()}',
+              title: title,
+              quality: quality,
+              qualityTags: tags,
+              sizeBytes: sizeBytes,
+              sizeHuman: ReleaseParser.formatSize(sizeBytes),
+              seeders: seeders,
+              leechers: leechers,
+              detectedLanguages: langs,
+              languageMatch: ReleaseParser.matchesAnyLanguage(langs, languages),
+              indexer: origin == 'Knaben' ? 'Knaben' : 'Knaben ($origin)',
+              infoHash: hash,
+              torrentUrl: torrentUrl,
+              magnetUrl: (magnet != null && magnet.startsWith('magnet:'))
+                  ? magnet
+                  : (hash != null ? buildMagnet(hash, title) : null),
+              preScanStatus: preStatus,
+              preScanWarnings: preWarn,
+              publishedAt: hit['date']?.toString(),
+            ),
+          );
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+    return out;
   }
 
   // -------------------------------------------------------------------
-  // 3. Internet Archive (Public Domain / Classic Films + .nfo support)
+  // 4. TorrentCSV Open-Source JSON API
+  // -------------------------------------------------------------------
+  Future<List<TorrentResult>> _searchTorrentCsv(
+    List<String> queries,
+    Set<LanguageFilter> languages,
+  ) async {
+    final out = <TorrentResult>[];
+    final seen = <String>{};
+
+    for (final q in queries.take(3)) {
+      try {
+        final uri = Uri.https('torrents-csv.com', '/service/search', {
+          'q': q,
+          'size': '30',
+        });
+        final resp = await http.get(uri, headers: _headers).timeout(_timeout);
+        if (resp.statusCode != 200) continue;
+        final decoded = jsonDecode(resp.body);
+        final list = decoded is List
+            ? decoded
+            : (decoded is Map<String, dynamic> ? (decoded['torrents'] as List? ?? []) : const []);
+
+        for (final item in list.whereType<Map<String, dynamic>>()) {
+          final name = (item['name'] ?? '').toString().trim();
+          final hash = (item['infohash'] ?? '').toString().trim().toUpperCase();
+          if (name.isEmpty || hash.length != 40 || !seen.add(hash)) continue;
+
+          final sizeBytes = (item['size_bytes'] as num?)?.toInt() ?? 0;
+          final seeders = (item['seeders'] as num?)?.toInt() ?? 0;
+          final leechers = (item['leechers'] as num?)?.toInt() ?? 0;
+          final (quality, tags) = ReleaseParser.parseQuality(name);
+          final langs = ReleaseParser.detectLanguages(name);
+          final (preStatus, preWarn) = ReleaseParser.preScanTitle(name, sizeBytes, seeders);
+
+          out.add(
+            TorrentResult(
+              id: 'tcsv-${hash.substring(0, 12).toLowerCase()}',
+              title: name,
+              quality: quality,
+              qualityTags: tags,
+              sizeBytes: sizeBytes,
+              sizeHuman: ReleaseParser.formatSize(sizeBytes),
+              seeders: seeders,
+              leechers: leechers,
+              detectedLanguages: langs,
+              languageMatch: ReleaseParser.matchesAnyLanguage(langs, languages),
+              indexer: 'TorrentCSV',
+              infoHash: hash,
+              torrentUrl: null,
+              magnetUrl: buildMagnet(hash, name),
+              preScanStatus: preStatus,
+              preScanWarnings: preWarn,
+            ),
+          );
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+    return out;
+  }
+
+  // -------------------------------------------------------------------
+  // 5. SolidTorrents Public JSON API
+  // -------------------------------------------------------------------
+  Future<List<TorrentResult>> _searchSolidTorrents(
+    List<String> queries,
+    Set<LanguageFilter> languages,
+  ) async {
+    final out = <TorrentResult>[];
+    final seen = <String>{};
+
+    for (final q in queries.take(3)) {
+      try {
+        final uri = Uri.https('solidtorrents.to', '/api/v1/search', {
+          'q': q,
+          'category': 'video',
+          'sort': 'seeders',
+        });
+        final resp = await http.get(uri, headers: _headers).timeout(_timeout);
+        if (resp.statusCode != 200) continue;
+        final decoded = jsonDecode(resp.body) as Map<String, dynamic>;
+        final items = (decoded['results'] as List? ?? []).whereType<Map<String, dynamic>>();
+
+        for (final item in items.take(25)) {
+          final title = (item['title'] ?? '').toString().trim();
+          final hash = (item['infohash'] ?? '').toString().trim().toUpperCase();
+          if (title.isEmpty || hash.length != 40 || !seen.add(hash)) continue;
+
+          final swarm = item['swarm'] as Map<String, dynamic>? ?? const {};
+          final sizeBytes = (item['size'] as num?)?.toInt() ?? 0;
+          final seeders = (swarm['seeders'] as num?)?.toInt() ?? 0;
+          final leechers = (swarm['leechers'] as num?)?.toInt() ?? 0;
+          final magnet = item['magnet']?.toString();
+
+          final (quality, tags) = ReleaseParser.parseQuality(title);
+          final langs = ReleaseParser.detectLanguages(title);
+          final (preStatus, preWarn) = ReleaseParser.preScanTitle(title, sizeBytes, seeders);
+
+          out.add(
+            TorrentResult(
+              id: 'solid-${hash.substring(0, 12).toLowerCase()}',
+              title: title,
+              quality: quality,
+              qualityTags: tags,
+              sizeBytes: sizeBytes,
+              sizeHuman: ReleaseParser.formatSize(sizeBytes),
+              seeders: seeders,
+              leechers: leechers,
+              detectedLanguages: langs,
+              languageMatch: ReleaseParser.matchesAnyLanguage(langs, languages),
+              indexer: 'SolidTorrents',
+              infoHash: hash,
+              torrentUrl: null,
+              magnetUrl: (magnet != null && magnet.startsWith('magnet:'))
+                  ? magnet
+                  : buildMagnet(hash, title),
+              preScanStatus: preStatus,
+              preScanWarnings: preWarn,
+              publishedAt: item['imported']?.toString(),
+            ),
+          );
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+    return out;
+  }
+
+  // -------------------------------------------------------------------
+  // 6. Internet Archive (Public Domain / Classic Films + .nfo support)
   // -------------------------------------------------------------------
   Future<List<TorrentResult>> _searchArchiveOrg(
     List<String> queries,
@@ -435,7 +635,7 @@ class IndexersService {
   }
 
   // -------------------------------------------------------------------
-  // 4. Optional Torznab XML (Jackett / Prowlarr)
+  // 7. Optional Torznab XML (Jackett / Prowlarr)
   // -------------------------------------------------------------------
   Future<List<TorrentResult>> _searchTorznab(
     TorznabConfig config,
@@ -529,5 +729,25 @@ class IndexersService {
       }
     }
     return out;
+  }
+
+  static List<String> _expandMultiTitleQueries(List<String> queries, int? year) {
+    final raw = <String>[];
+    final suffix = year != null ? ' $year' : '';
+    for (final q in queries) {
+      raw.add('$q$suffix');
+      if (suffix.isNotEmpty) raw.add(q);
+    }
+    if (queries.isNotEmpty) {
+      raw.add('${queries.first} FRENCH');
+    }
+    final seen = <String>{};
+    return raw.where((t) => seen.add(t.toLowerCase().trim())).toList();
+  }
+
+  static String? _extractHashFromMagnet(String? magnet) {
+    if (magnet == null) return null;
+    final m = RegExp(r'btih:([0-9a-fA-F]{40})').firstMatch(magnet);
+    return m?.group(1)?.toUpperCase();
   }
 }

@@ -82,15 +82,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 title: const Text('Bloquer les archives (.zip, .rar, .7z)'),
                 subtitle: const Text('Protège contre les faux films piégés par mot de passe'),
               ),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _draft.saveHistory,
-                onChanged: (v) => setState(() => _draft = _draft.copyWith(saveHistory: v)),
-                title: const Text('Enregistrer l\'historique local'),
-              ),
               const Divider(),
-              const Text('🔎 Indexeurs intégrés (zéro pub / zéro JS)',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
+              const Text(
+                '🔎 Sources intégrées (APIs JSON sans pub / sans JS)',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.enableYts,
@@ -101,7 +97,25 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 contentPadding: EdgeInsets.zero,
                 value: _draft.enableApibay,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(enableApibay: v)),
-                title: const Text('APIBay (JSON pur — FR / EN / ES)'),
+                title: const Text('APIBay (JSON pur — NFO détaillé)'),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _draft.enableKnaben,
+                onChanged: (v) => setState(() => _draft = _draft.copyWith(enableKnaben: v)),
+                title: const Text('Knaben (Multi-trackers : 1337x, TGx, TPB, RuTracker...)'),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _draft.enableTorrentCsv,
+                onChanged: (v) => setState(() => _draft = _draft.copyWith(enableTorrentCsv: v)),
+                title: const Text('TorrentCSV (Base open-source JSON)'),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _draft.enableSolidTorrents,
+                onChanged: (v) => setState(() => _draft = _draft.copyWith(enableSolidTorrents: v)),
+                title: const Text('SolidTorrents (API JSON vidéo)'),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
@@ -110,8 +124,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 title: const Text('Internet Archive (Classiques & domaine public)'),
               ),
               const Divider(),
-              const Text('🔌 Torznab optionnel (Jackett / Prowlarr)',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
+              const Text(
+                '🔌 Torznab optionnel (Jackett / Prowlarr)',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 6),
               ..._draft.torznabIndexers.map(
                 (tz) => ListTile(
@@ -139,7 +155,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
               const SizedBox(height: 6),
               TextField(
                 controller: _tzUrlCtrl,
-                decoration: const InputDecoration(labelText: 'URL Torznab (http/https)', isDense: true),
+                decoration:
+                    const InputDecoration(labelText: 'URL Torznab (http/https)', isDense: true),
               ),
               const SizedBox(height: 6),
               Row(

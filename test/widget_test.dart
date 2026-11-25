@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:safetorrent/main.dart';
 import 'package:safetorrent/services/local_storage.dart';
+import 'package:safetorrent/ui/widgets/country_flag.dart';
 
 void main() {
-  testWidgets('SafeTorrent launches with guided 3-step search, AlloCiné lookup, and multi-flags',
+  testWidgets('SafeTorrent launches with title-only search, no history tab, and reset button',
       (tester) async {
     final tmpDir = Directory.systemTemp.createTempSync('safetorrent_widget_');
     addTearDown(() {
@@ -20,23 +21,40 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('SafeTorrent'), findsOneWidget);
-    expect(find.text('1. Film'), findsOneWidget);
-    expect(find.text('2. Correspondance'), findsOneWidget);
-    expect(find.text('3. Torrents'), findsOneWidget);
     expect(find.text('Identifier le film (AlloCiné / Bases)'), findsOneWidget);
-    expect(find.text('Année'), findsOneWidget);
-    expect(find.text('🇫🇷 Français'), findsOneWidget);
-    expect(find.text('🇬🇧 English'), findsOneWidget);
-    expect(find.text('🇪🇸 Español'), findsOneWidget);
+    expect(find.text('Rechercher'), findsOneWidget);
+    expect(find.text('Plus tard'), findsOneWidget);
 
-    // Typing a film title reveals the "Nouvelle recherche" reset button
+    // History, year field, and step-1 language selectors are removed
+    expect(find.text('Historique'), findsNothing);
+    expect(find.text('Année'), findsNothing);
+
+    // Typing reveals "Nouvelle recherche" and tapping resets to zero
     await tester.enterText(find.byType(TextField).first, 'Inception');
     await tester.pumpAndSettle();
     expect(find.text('Nouvelle recherche'), findsOneWidget);
 
-    // Tapping reset clears the field back to zero
     await tester.tap(find.text('Nouvelle recherche'));
     await tester.pumpAndSettle();
     expect(find.text('Inception'), findsNothing);
+  });
+
+  testWidgets('CountryFlag renders vector flags for FR, EN, ES, MULTI without errors',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Row(
+            children: [
+              CountryFlag(code: 'FR'),
+              CountryFlag(code: 'EN'),
+              CountryFlag(code: 'ES'),
+              CountryFlag(code: 'MULTI'),
+            ],
+          ),
+        ),
+      ),
+    );
+    expect(find.byType(CountryFlag), findsNWidgets(4));
   });
 }

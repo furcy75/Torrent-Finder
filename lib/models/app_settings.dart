@@ -32,59 +32,71 @@ class TorznabConfig {
 
 class AppSettings {
   const AppSettings({
-    this.saveHistory = false,
     this.strictVideoOnly = true,
     this.blockArchives = true,
     this.enableYts = true,
     this.enableApibay = true,
+    this.enableKnaben = true,
+    this.enableTorrentCsv = true,
+    this.enableSolidTorrents = true,
     this.enableArchiveOrg = true,
     this.torznabIndexers = const [],
   });
 
-  final bool saveHistory;
   final bool strictVideoOnly;
   final bool blockArchives;
   final bool enableYts;
   final bool enableApibay;
+  final bool enableKnaben;
+  final bool enableTorrentCsv;
+  final bool enableSolidTorrents;
   final bool enableArchiveOrg;
   final List<TorznabConfig> torznabIndexers;
 
   AppSettings copyWith({
-    bool? saveHistory,
     bool? strictVideoOnly,
     bool? blockArchives,
     bool? enableYts,
     bool? enableApibay,
+    bool? enableKnaben,
+    bool? enableTorrentCsv,
+    bool? enableSolidTorrents,
     bool? enableArchiveOrg,
     List<TorznabConfig>? torznabIndexers,
   }) {
     return AppSettings(
-      saveHistory: saveHistory ?? this.saveHistory,
       strictVideoOnly: strictVideoOnly ?? this.strictVideoOnly,
       blockArchives: blockArchives ?? this.blockArchives,
       enableYts: enableYts ?? this.enableYts,
       enableApibay: enableApibay ?? this.enableApibay,
+      enableKnaben: enableKnaben ?? this.enableKnaben,
+      enableTorrentCsv: enableTorrentCsv ?? this.enableTorrentCsv,
+      enableSolidTorrents: enableSolidTorrents ?? this.enableSolidTorrents,
       enableArchiveOrg: enableArchiveOrg ?? this.enableArchiveOrg,
       torznabIndexers: torznabIndexers ?? this.torznabIndexers,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'saveHistory': saveHistory,
         'strictVideoOnly': strictVideoOnly,
         'blockArchives': blockArchives,
         'enableYts': enableYts,
         'enableApibay': enableApibay,
+        'enableKnaben': enableKnaben,
+        'enableTorrentCsv': enableTorrentCsv,
+        'enableSolidTorrents': enableSolidTorrents,
         'enableArchiveOrg': enableArchiveOrg,
         'torznabIndexers': torznabIndexers.map((e) => e.toJson()).toList(),
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
-        saveHistory: json['saveHistory'] as bool? ?? false,
         strictVideoOnly: json['strictVideoOnly'] as bool? ?? true,
         blockArchives: json['blockArchives'] as bool? ?? true,
         enableYts: json['enableYts'] as bool? ?? true,
         enableApibay: json['enableApibay'] as bool? ?? true,
+        enableKnaben: json['enableKnaben'] as bool? ?? true,
+        enableTorrentCsv: json['enableTorrentCsv'] as bool? ?? true,
+        enableSolidTorrents: json['enableSolidTorrents'] as bool? ?? true,
         enableArchiveOrg: json['enableArchiveOrg'] as bool? ?? true,
         torznabIndexers: ((json['torznabIndexers'] as List?) ?? const [])
             .whereType<Map<String, dynamic>>()

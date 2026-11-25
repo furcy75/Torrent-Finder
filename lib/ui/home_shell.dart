@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:safetorrent/models/torrent_result.dart';
 import 'package:safetorrent/services/local_storage.dart';
-import 'package:safetorrent/ui/history_screen.dart';
 import 'package:safetorrent/ui/search_screen.dart';
 import 'package:safetorrent/ui/settings_dialog.dart';
 import 'package:safetorrent/ui/watchlist_screen.dart';
@@ -11,14 +9,12 @@ class PendingSearchRequest {
     required this.query,
     this.originalTitle,
     this.year,
-    required this.languages,
     this.watchlistId,
   });
 
   final String query;
   final String? originalTitle;
   final int? year;
-  final List<LanguageFilter> languages;
   final String? watchlistId;
 }
 
@@ -69,28 +65,9 @@ class _HomeShellState extends State<HomeShell> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _toggleHistory(bool value) async {
-    await widget.storage.updateSettings(
-      widget.storage.settings.copyWith(saveHistory: value),
-    );
-    if (!mounted) return;
-    setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          value
-              ? 'Historique local activé sur cet appareil.'
-              : 'Historique local désactivé.',
-        ),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final watchlistCount = widget.storage.watchlist.length;
-    final historyCount = widget.storage.history.length;
 
     return Scaffold(
       appBar: AppBar(
@@ -120,19 +97,6 @@ class _HomeShellState extends State<HomeShell> {
           ],
         ),
         actions: [
-          Tooltip(
-            message: 'Activer / désactiver l\'historique local',
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Historique', style: TextStyle(fontSize: 12)),
-                Switch(
-                  value: widget.storage.settings.saveHistory,
-                  onChanged: _ready ? _toggleHistory : null,
-                ),
-              ],
-            ),
-          ),
           IconButton(
             tooltip: 'Réglages sécurité & sources',
             icon: const Icon(Icons.settings_outlined),
@@ -157,11 +121,6 @@ class _HomeShellState extends State<HomeShell> {
                   onRerunSearch: _triggerSearch,
                   onDataChanged: () => setState(() {}),
                 ),
-                HistoryScreen(
-                  storage: widget.storage,
-                  onRerunSearch: _triggerSearch,
-                  onDataChanged: () => setState(() {}),
-                ),
               ],
             ),
       bottomNavigationBar: NavigationBar(
@@ -180,14 +139,6 @@ class _HomeShellState extends State<HomeShell> {
               child: const Icon(Icons.bookmark_outline),
             ),
             label: 'Plus tard',
-          ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: historyCount > 0,
-              label: Text('$historyCount'),
-              child: const Icon(Icons.history),
-            ),
-            label: 'Historique',
           ),
         ],
       ),
