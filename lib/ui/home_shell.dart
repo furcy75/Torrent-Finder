@@ -40,7 +40,10 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
-    _initStorage();
+    _ready = widget.storage.isLoaded;
+    if (!_ready) {
+      _initStorage();
+    }
   }
 
   Future<void> _initStorage() async {

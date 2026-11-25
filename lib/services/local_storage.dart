@@ -19,6 +19,7 @@ class LocalStorageService {
   AppSettings settings = const AppSettings();
   List<HistoryItem> history = [];
   List<WatchlistItem> watchlist = [];
+  bool isLoaded = false;
 
   Future<File> _storageFile() async {
     final dir = _overrideDirectory ?? await getApplicationSupportDirectory();
@@ -53,6 +54,8 @@ class LocalStorageService {
       }
     } catch (_) {
       // Fall back cleanly to defaults if file is empty or unreadable
+    } finally {
+      isLoaded = true;
     }
   }
 
