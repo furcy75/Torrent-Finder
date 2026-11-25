@@ -35,14 +35,16 @@ class AllocineService {
     final clean = query.trim();
     if (clean.isEmpty) return [];
 
-    // Query AlloCiné and Wikidata (FR/EN/ES) concurrently to maximize multilingual coverage
+    // Query AlloCiné, Wikidata (FR/EN/ES), and IMDb (for posters/fallback) concurrently
     final results = await Future.wait([
       _searchAllocine(clean, year: year, limit: limit),
       _searchWikidataMultilingual(clean, year: year, limit: limit),
+      _searchImdb(clean, year: year, limit: limit),
     ]);
 
     final allocineHits = results[0];
     final wikiHits = results[1];
+    final imdbHits = results[2];
 
     // Enrich AlloCiné results with FR / EN / ES labels found via Wikidata when matching
     final merged = <MovieSuggestion>[];
@@ -62,6 +64,7 @@ class AllocineService {
             titleEn: enriched.titleEn ?? w.titleEn,
             titleEs: enriched.titleEs ?? w.titleEs,
             year: enriched.year ?? w.year,
+            synopsis: enriched.synopsis ?? w.synopsis,
             source: 'AlloCiné + Wikidata',
           );
           break;
@@ -82,8 +85,46 @@ class AllocineService {
       if (!dup) merged.add(w);
     }
 
+    // Enrich any suggestion missing a poster thumbnail using IMDb suggestions
+    for (var i = 0; i < merged.length; i++) {
+      final m = merged[i];
+      if (m.posterUrl != null) continue;
+      final candidates = m.allDistinctTitles.map((t) => t.toLowerCase()).toSet();
+      for (final im in imdbHits) {
+        if (im.posterUrl == null) continue;
+        final yearOk = m.year == null || im.year == null || (m.year! - im.year!).abs() <= 1;
+        if (yearOk && candidates.contains(im.titleOriginal.toLowerCase())) {
+          merged[i] = m.copyWith(posterUrl: im.posterUrl);
+          break;
+        }
+      }
+    }
+
+    // If still missing poster for top 3 Wikidata items (e.g. French query -> English IMDb title),
+    // do a lightweight poster fetch using the English title
+    final posterTasks = <Future<void>>[];
+    for (var i = 0; i < merged.length && i < 3; i++) {
+      final m = merged[i];
+      final lookupTitle = m.titleEn ?? m.titleOriginal;
+      if (m.posterUrl == null && lookupTitle.toLowerCase() != clean.toLowerCase()) {
+        final idx = i;
+        posterTasks.add(() async {
+          final hits = await _searchImdb(lookupTitle, year: m.year, limit: 2);
+          for (final h in hits) {
+            if (h.posterUrl != null) {
+              merged[idx] = merged[idx].copyWith(posterUrl: h.posterUrl);
+              break;
+            }
+          }
+        }());
+      }
+    }
+    if (posterTasks.isNotEmpty) {
+      await Future.wait(posterTasks);
+    }
+
     if (merged.isEmpty) {
-      merged.addAll(await _searchImdb(clean, year: year, limit: limit));
+      merged.addAll(imdbHits);
     }
 
     // Prioritize exact year match if user specified a year

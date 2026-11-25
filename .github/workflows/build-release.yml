@@ -150,7 +150,7 @@ jobs:
           flutter build linux --release
           tar -czf SafeTorrent-Linux-x64.tar.gz -C build/linux/x64/release/bundle .
           chmod +x installer/build_deb.sh
-          bash installer/build_deb.sh 1.1.0
+          bash installer/build_deb.sh 1.2.0
 
       - name: Upload Linux DEB & tar.gz artifacts
         uses: actions/upload-artifact@v4

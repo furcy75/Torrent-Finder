@@ -7,14 +7,29 @@ import 'package:safetorrent/models/watchlist_item.dart';
 import 'package:safetorrent/services/local_storage.dart';
 
 void main() {
-  test('LocalStorage persists multi-language history and watchlist on disk', () async {
+  test('LocalStorage keeps history disabled by default, deduplicates when enabled, and persists watchlist',
+      () async {
     final tmpDir = await Directory.systemTemp.createTemp('safetorrent_test_');
     addTearDown(() => tmpDir.delete(recursive: true));
 
     final storage = LocalStorageService(overrideDirectory: tmpDir);
     await storage.load();
 
-    // History enabled by default (multi-language + year)
+    // History disabled by default so unnecessary history is not stored
+    expect(storage.settings.saveHistory, isFalse);
+    await storage.addHistory(
+      HistoryItem(
+        id: 'h0',
+        query: 'Not Stored',
+        languages: const [LanguageFilter.fr],
+        resultCount: 1,
+        createdAt: DateTime.now().toUtc(),
+      ),
+    );
+    expect(storage.history, isEmpty);
+
+    // Enable history -> stores & deduplicates identical film searches
+    await storage.updateSettings(storage.settings.copyWith(saveHistory: true));
     await storage.addHistory(
       HistoryItem(
         id: 'h1',
@@ -26,21 +41,19 @@ void main() {
         createdAt: DateTime.now().toUtc(),
       ),
     );
-    expect(storage.history.length, equals(1));
-    expect(storage.history.first.languages, equals([LanguageFilter.fr, LanguageFilter.en]));
-
-    // Disable history -> new searches are NOT saved
-    await storage.updateSettings(storage.settings.copyWith(saveHistory: false));
     await storage.addHistory(
       HistoryItem(
-        id: 'h2',
-        query: 'Secret Movie',
-        languages: const [LanguageFilter.en],
-        resultCount: 0,
+        id: 'h1_dup',
+        query: 'les évadés',
+        originalTitle: 'The Shawshank Redemption',
+        year: 1994,
+        languages: const [LanguageFilter.fr],
+        resultCount: 6,
         createdAt: DateTime.now().toUtc(),
       ),
     );
     expect(storage.history.length, equals(1));
+    expect(storage.history.first.resultCount, equals(6));
 
     // Watchlist deduplication + reload from disk
     final added1 = await storage.addToWatchlist(
@@ -65,7 +78,7 @@ void main() {
 
     final reloaded = LocalStorageService(overrideDirectory: tmpDir);
     await reloaded.load();
-    expect(reloaded.settings.saveHistory, isFalse);
+    expect(reloaded.settings.saveHistory, isTrue);
     expect(reloaded.history.length, equals(1));
     expect(reloaded.history.first.year, equals(1994));
     expect(reloaded.watchlist.length, equals(1));

@@ -32,7 +32,7 @@ class TorznabConfig {
 
 class AppSettings {
   const AppSettings({
-    this.saveHistory = true,
+    this.saveHistory = false,
     this.strictVideoOnly = true,
     this.blockArchives = true,
     this.enableYts = true,
@@ -80,7 +80,7 @@ class AppSettings {
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
-        saveHistory: json['saveHistory'] as bool? ?? true,
+        saveHistory: json['saveHistory'] as bool? ?? false,
         strictVideoOnly: json['strictVideoOnly'] as bool? ?? true,
         blockArchives: json['blockArchives'] as bool? ?? true,
         enableYts: json['enableYts'] as bool? ?? true,

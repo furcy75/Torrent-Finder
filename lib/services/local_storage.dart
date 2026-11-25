@@ -78,9 +78,15 @@ class LocalStorageService {
 
   Future<void> addHistory(HistoryItem item) async {
     if (!settings.saveHistory) return;
+    final cleanQuery = item.query.trim().toLowerCase();
+    if (cleanQuery.isEmpty) return;
+    // Deduplicate identical movie queries so history never accumulates redundant clutter
+    history.removeWhere(
+      (e) => e.query.trim().toLowerCase() == cleanQuery && e.year == item.year,
+    );
     history.insert(0, item);
-    if (history.length > 100) {
-      history = history.sublist(0, 100);
+    if (history.length > 50) {
+      history = history.sublist(0, 50);
     }
     await _save();
   }
