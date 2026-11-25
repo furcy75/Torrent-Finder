@@ -1,16 +1,16 @@
-; Inno Setup script to package SafeTorrent Windows into a single `.exe` installer
+; Inno Setup script to package Torrent Seeder Windows into a single `.exe` installer
 [Setup]
 AppId={{8D6B4A7E-9A51-4D8C-B9B5-4C7D29D7A101}
-AppName=SafeTorrent
-AppVersion=1.6.0
-AppPublisher=SafeTorrent
-DefaultDirName={autopf}\SafeTorrent
-DefaultGroupName=SafeTorrent
+AppName=Torrent Seeder
+AppVersion=2.0.0
+AppPublisher=Torrent Seeder
+DefaultDirName={autopf}\Torrent Seeder
+DefaultGroupName=Torrent Seeder
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=..
-OutputBaseFilename=SafeTorrent-Windows-Setup
+OutputBaseFilename=TorrentSeeder-Windows-Setup
 SetupIconFile=app_icon.ico
 UninstallDisplayIcon={app}\safetorrent.exe
 Compression=lzma2
@@ -30,8 +30,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\SafeTorrent"; Filename: "{app}\safetorrent.exe"
-Name: "{autodesktop}\SafeTorrent"; Filename: "{app}\safetorrent.exe"; Tasks: desktopicon
+Name: "{autoprograms}\Torrent Seeder"; Filename: "{app}\safetorrent.exe"
+Name: "{autodesktop}\Torrent Seeder"; Filename: "{app}\safetorrent.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\safetorrent.exe"; Description: "{cm:LaunchProgram,SafeTorrent}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\safetorrent.exe"; Description: "{cm:LaunchProgram,Torrent Seeder}"; Flags: nowait postinstall skipifsilent

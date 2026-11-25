@@ -96,7 +96,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 children: [
                   const Expanded(
                     child: Text(
-                      '☁️ Comptes Seedr famille',
+                      '☁️ Comptes Seedr',
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
@@ -115,7 +115,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 const Padding(
                   padding: EdgeInsets.only(bottom: 6),
                   child: Text(
-                    'Aucun compte Seedr connecté. Ouvrez l\'onglet Seedr pour connecter un ou plusieurs comptes familiaux.',
+                    'Aucun compte Seedr connecté. Ouvrez l\'onglet Seedr pour connecter un ou plusieurs comptes.',
                     style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                   ),
                 )

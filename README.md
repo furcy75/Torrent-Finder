@@ -1,31 +1,34 @@
 <div align="center">
 
-<img src="assets/icon/app_icon.png" alt="SafeTorrent Logo" width="128" height="128" />
+<img src="assets/icon/app_icon.png" alt="Torrent Seeder Logo" width="128" height="128" />
 
-# SafeTorrent
+# Torrent Seeder
 
-**Moteur de recherche Torrent autonome pour Films & Séries TV avec bac à sable anti-virus intégré**
+**Moteur de recherche Torrent autonome pour Films & Séries TV avec bac à sable anti-virus et intégration Seedr.cc multi-comptes**
 
-*100 % autonome sur Android, Windows et Linux — Zéro serveur, zéro infrastructure, zéro publicité, zéro navigateur piégé.*
+*100 % autonome sur Android, Windows et Linux — Zéro serveur, zéro publicité, zéro navigateur piégé.*
+
+**🇫🇷 Français** | [🇬🇧 English](README.en.md) | [🇪🇸 Español](README.es.md)
 
 [![Build & Release](https://github.com/furcy75/Torrent-Finder/actions/workflows/build-release.yml/badge.svg)](https://github.com/furcy75/Torrent-Finder/actions/workflows/build-release.yml)
 [![Latest Release](https://img.shields.io/github/v/release/furcy75/Torrent-Finder?color=22c55e&label=Version)](https://github.com/furcy75/Torrent-Finder/releases/latest)
 [![Platforms](https://img.shields.io/badge/Plateformes-Android%20%7C%20Windows%20%7C%20Linux-38bdf8)](#téléchargement)
+[![GitHub Sponsors](https://img.shields.io/badge/Soutenir-GitHub%20Sponsors-db2777?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/furcy75)
 [![License: MIT](https://img.shields.io/badge/Licence-MIT-94a3b8.svg)](LICENSE)
 
 </div>
 
 ---
 
-## 🎯 Pourquoi SafeTorrent ?
+## 🎯 Pourquoi Torrent Seeder ?
 
 Chercher un fichier `.torrent` sur le web expose habituellement à deux menaces majeures : les **pages web publicitaires piégées** (popups, faux boutons « Download », scripts malveillants) et les **faux torrents** contenant des exécutables déguisés (`Film.mkv.exe`, raccourcis `.lnk`, archives `.rar` piégées).
 
-**SafeTorrent** élimine ces deux risques grâce à une architecture **100 % locale et autonome** :
+**Torrent Seeder** élimine ces deux risques grâce à une architecture **100 % locale et autonome** :
 
 - **Aucun serveur requis** : l'APK Android tourne en totale autonomie sur votre téléphone, tout comme l'application Windows et Linux.
 - **Aucune WebView / aucun navigateur** : les recherches s'effectuent exclusivement via des requêtes HTTP brutes (APIs JSON / RSS XML / métadonnées).
-- **Bac à sable intégré** : chaque `.torrent` est téléchargé en mémoire dans un **Isolate Dart séparé**, inspecté fichier par fichier, puis **reconstruit à neuf** sans métadonnées externes avant d'être enregistré.
+- **Bac à sable intégré** : chaque `.torrent` est téléchargé en mémoire dans un **Isolate Dart séparé**, inspecté fichier par fichier, puis **reconstruit à neuf** sans métadonnées externes avant d'être enregistré ou envoyé vers Seedr.
 
 ---
 
@@ -35,11 +38,11 @@ Récupérez directement la dernière version prête à l'emploi depuis [**GitHub
 
 | Plateforme | Fichier | Installation |
 | :--- | :--- | :--- |
-| **Android** *(autonome)* | [`SafeTorrent-Android.apk`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/SafeTorrent-Android.apk) | Installer l'APK directement sur le téléphone |
-| **Windows** *(Installateur)* | [`SafeTorrent-Windows-Setup.exe`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/SafeTorrent-Windows-Setup.exe) | Double-clic (DLLs Visual C++ incluses, zéro prérequis) |
-| **Windows** *(Portable)* | [`SafeTorrent-Windows-Portable.zip`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/SafeTorrent-Windows-Portable.zip) | Décompresser et lancer `safetorrent.exe` |
-| **Linux** *(Ubuntu / Debian / Mint)* | [`SafeTorrent-Linux-amd64.deb`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/SafeTorrent-Linux-amd64.deb) | `sudo apt install ./SafeTorrent-Linux-amd64.deb` |
-| **Linux** *(Portable)* | [`SafeTorrent-Linux-x64.tar.gz`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/SafeTorrent-Linux-x64.tar.gz) | Décompresser et lancer `./safetorrent` |
+| **Android** *(autonome)* | [`TorrentSeeder-Android.apk`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/TorrentSeeder-Android.apk) | Installer l'APK directement sur le téléphone |
+| **Windows** *(Installateur)* | [`TorrentSeeder-Windows-Setup.exe`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/TorrentSeeder-Windows-Setup.exe) | Double-clic (DLLs Visual C++ incluses, zéro prérequis) |
+| **Windows** *(Portable)* | [`TorrentSeeder-Windows-Portable.zip`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/TorrentSeeder-Windows-Portable.zip) | Décompresser et lancer `safetorrent.exe` |
+| **Linux** *(Ubuntu / Debian / Mint)* | [`TorrentSeeder-Linux-amd64.deb`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/TorrentSeeder-Linux-amd64.deb) | `sudo apt install ./TorrentSeeder-Linux-amd64.deb` |
+| **Linux** *(Portable)* | [`TorrentSeeder-Linux-x64.tar.gz`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/TorrentSeeder-Linux-x64.tar.gz) | Décompresser et lancer `./safetorrent` |
 
 ---
 
@@ -59,12 +62,13 @@ Récupérez directement la dernière version prête à l'emploi depuis [**GitHub
   - **Résolution** : `4K`, `1080p`, `720p`
   - **Source & Codec** : `BluRay`, `WEB-DL`, `WEBRip`, `HDRip`, `H.264 / x264`, `x265`, `HDR`
   - **Qualité** : `🚫 Sans CAM/TS` *(activé par défaut)*
-- **Visionneuse NFO / Détails sécurisée** : consulte le NFO/MediaInfo en texte brut monospace (APIBay `t.php`, fiche YTS, `.nfo` Internet Archive) sans jamais rendre de HTML ou JavaScript.
+- **Visionneuse NFO / Détails sécurisée** : consulte le NFO/MediaInfo en texte brut monospace sans jamais rendre de HTML ou JavaScript.
 
-### ☁️ Intégration Seedr.cc en direct (optionnelle, multi-comptes famille)
-- **Plusieurs comptes familiaux** : connectez plusieurs comptes Seedr nommés (*Moi*, *Sœur*, *Fille*...) via **Code Appareil** (`seedr.cc/devices`, renouvellement auto sans mot de passe) ou **Email & Mot de passe** (seul le jeton OAuth est conservé localement, jamais votre mot de passe).
-- **Sélecteur de compte selon le quota disponible** : lors de l'envoi d'un lien Magnet ou d'un `.torrent` assaini par le bac à sable, SafeTorrent vérifie en direct l'espace libre de chaque compte et vous laisse **choisir manuellement** sur quel compte l'envoyer.
-- **Gestion en direct du compte** dans l'onglet **Seedr** : changement rapide entre comptes famille, jauge de quota utilisé/libre, suivi auto-actualisé des transferts en cours, explorateur de dossiers/fichiers, téléchargement direct HTTPS, archive `.zip` de dossier, copie du lien direct (VLC) et suppression en un clic.
+### ☁️ Intégration Seedr.cc en direct (multi-comptes & suivi discret)
+- **Gestion de plusieurs comptes Seedr** : connectez autant de comptes nommés que souhaité via **Code Appareil** (`seedr.cc/devices`, renouvellement automatique sans mot de passe) ou **Email & Mot de passe** (seul le jeton OAuth est conservé localement, jamais votre mot de passe).
+- **Sélecteur manuel avec quota & statut en direct** : lors de l'envoi d'un Magnet ou d'un `.torrent` assaini par le bac à sable, **Torrent Seeder** vérifie en direct l'espace libre de chaque compte et indique si un **téléchargement est déjà en cours**, puis vous laisse **sélectionner manuellement** le compte cible.
+- **Notification discrète de fin de téléchargement** : un pop-up sobre (**« Fichier téléchargé »**, sans afficher le nom ni le détail du fichier) vous prévient automatiquement dès qu'un transfert Seedr se termine.
+- **Gestion complète en direct** dans l'onglet **Seedr** : bascule entre comptes, jauge de quota, suivi auto-actualisé des transferts, explorateur de dossiers/fichiers, téléchargement direct HTTPS, archive `.zip` de dossier, copie du lien direct (VLC) et suppression en un clic.
 
 ### 📌 Liste « Plus tard » (sans historique superflu)
 - Aucun historique de navigation inutile n'est enregistré.
@@ -83,7 +87,7 @@ flowchart LR
     B --> S["Inspecteur Anti-Malware<br/>(Bloque .exe/.lnk/.bat/RTLO/../.rar)"]
     S -->|Menace détectée| X["⛔ Bloqué + Rapport détaillé"]
     S -->|100% Vidéo/Sous-titres| C["Reconstructeur .torrent propre<br/>(SHA-1 info_hash préservé)"]
-    C --> D["✅ Export .torrent sécurisé"]
+    C --> D["✅ Export .torrent ou envoi Seedr"]
 ```
 
 ### Protections actives dans le bac à sable
@@ -120,6 +124,14 @@ Toutes les sources sont activables/désactivables individuellement dans **⚙️
 
 ---
 
+## 💖 Soutenir le projet
+
+**Torrent Seeder** est gratuit, open-source et sans aucune publicité. Si ce logiciel vous est utile, vous pouvez soutenir son développement via [**GitHub Sponsors**](https://github.com/sponsors/furcy75) (également accessible depuis l'icône de don dédiée dans l'application).
+
+[![Sponsoriser sur GitHub](https://img.shields.io/badge/Faire%20un%20don-GitHub%20Sponsors-db2777?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/furcy75)
+
+---
+
 ## 🛠️ Développement & Compilation locale
 
 Prérequis : [Flutter 3.24+](https://docs.flutter.dev/get-started/install) (Dart 3.3+) et Python 3 + Pillow *(pour générer les icônes natives)*.
@@ -144,26 +156,10 @@ flutter build windows --release    # Windows x64
 flutter build linux --release      # Linux x64
 ```
 
-### Structure du dépôt
-```text
-├── assets/icon/app_icon.png          # Icône maître 1024x1024
-├── installer/
-│   ├── generate_icons.py             # Génération icônes Android/Windows/Linux
-│   ├── windows_setup.iss             # Script installateur Inno Setup (.exe)
-│   └── build_deb.sh                  # Empaquetage Debian/Ubuntu (.deb)
-├── lib/
-│   ├── models/                       # Modèles Film/Série, Torrent, SafetyReport, Watchlist
-│   ├── sandbox/                      # Bencode strict, Anti-Malware Sanitizer, Isolate Worker
-│   ├── services/                     # AlloCiné/TVMaze/Wikidata, 10 Indexeurs, NFO, Stockage local
-│   └── ui/                           # Interface Material 3, CountryFlag vectoriel, modales
-├── test/                             # Tests unitaires Bencode, Sécurité/SSRF, Parser, Stockage, UI
-└── .github/workflows/build-release.yml
-```
-
 ---
 
 ## ⚖️ Avertissement légal & Licence
 
-SafeTorrent est un outil technique de recherche et d'assainissement de métadonnées BitTorrent (`.torrent`). L'application n'héberge aucun contenu protégé. Chaque utilisateur est seul responsable de l'usage qu'il en fait et du respect de la législation sur le droit d'auteur en vigueur dans son pays.
+Torrent Seeder est un outil technique de recherche et d'assainissement de métadonnées BitTorrent (`.torrent`). L'application n'héberge aucun contenu protégé. Chaque utilisateur est seul responsable de l'usage qu'il en fait et du respect de la législation sur le droit d'auteur en vigueur dans son pays.
 
 Distribué sous licence **MIT** — voir [LICENSE](LICENSE).

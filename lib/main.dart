@@ -4,11 +4,11 @@ import 'package:safetorrent/ui/home_shell.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const SafeTorrentApp());
+  runApp(const TorrentSeederApp());
 }
 
-class SafeTorrentApp extends StatelessWidget {
-  const SafeTorrentApp({super.key, this.storage});
+class TorrentSeederApp extends StatelessWidget {
+  const TorrentSeederApp({super.key, this.storage});
 
   final LocalStorageService? storage;
 
@@ -21,7 +21,7 @@ class SafeTorrentApp extends StatelessWidget {
     );
 
     return MaterialApp(
-      title: 'SafeTorrent',
+      title: 'Torrent Seeder',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

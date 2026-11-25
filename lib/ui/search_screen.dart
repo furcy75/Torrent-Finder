@@ -26,6 +26,7 @@ class SearchScreen extends StatefulWidget {
     required this.triggerId,
     required this.onDataChanged,
     this.onOpenSeedr,
+    this.onSeedrTransferStarted,
   });
 
   final LocalStorageService storage;
@@ -33,6 +34,7 @@ class SearchScreen extends StatefulWidget {
   final int triggerId;
   final VoidCallback onDataChanged;
   final VoidCallback? onOpenSeedr;
+  final ValueChanged<String>? onSeedrTransferStarted;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -471,6 +473,7 @@ class _SearchScreenState extends State<SearchScreen> {
         settings: widget.storage.settings,
         storage: widget.storage,
         onSentToSeedr: widget.onOpenSeedr,
+        onSeedrTransferStarted: widget.onSeedrTransferStarted,
       ),
     );
   }
@@ -501,6 +504,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _showSnack('Envoi vers Seedr (${chosen.displayName}) en cours...');
       final msg = await seedr.addMagnet(magnet, account: chosen);
       await widget.storage.setActiveSeedrAccount(chosen.id);
+      widget.onSeedrTransferStarted?.call(chosen.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

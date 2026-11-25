@@ -9,7 +9,7 @@ import 'package:safetorrent/models/watchlist_item.dart';
 /// 100% on-device local persistence (Android, Windows, Linux — zero server/cloud).
 ///
 /// Stores user settings, the "Plus tard" watchlist, and optional named Seedr
-/// family accounts (OAuth tokens only — passwords are NEVER saved).
+/// accounts (OAuth tokens only — passwords are NEVER saved).
 class LocalStorageService {
   LocalStorageService({Directory? overrideDirectory})
       : _overrideDirectory = overrideDirectory;

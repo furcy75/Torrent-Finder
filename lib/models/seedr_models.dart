@@ -1,5 +1,5 @@
 /// Local Seedr OAuth account session (password is NEVER persisted on disk).
-/// Supports multiple named family accounts (e.g., "Moi", "Sœur", "Fille").
+/// Supports multiple named Seedr accounts.
 class SeedrSession {
   const SeedrSession({
     required this.id,
@@ -126,19 +126,24 @@ class SeedrSession {
   }
 }
 
-/// Live quota snapshot for a single Seedr account, used in the manual account picker.
+/// Live quota & transfer status snapshot for a single Seedr account,
+/// used in the manual account picker.
 class SeedrAccountQuota {
   const SeedrAccountQuota({
     required this.account,
     this.spaceUsed,
     this.spaceMax,
+    this.activeDownloadsCount = 0,
     this.error,
   });
 
   final SeedrSession account;
   final int? spaceUsed;
   final int? spaceMax;
+  final int activeDownloadsCount;
   final String? error;
+
+  bool get hasActiveDownloads => activeDownloadsCount > 0;
 
   int? get spaceFree {
     if (spaceMax == null || spaceMax! <= 0 || spaceUsed == null) return null;

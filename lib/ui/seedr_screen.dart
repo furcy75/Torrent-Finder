@@ -14,11 +14,18 @@ class SeedrScreen extends StatefulWidget {
     required this.storage,
     required this.refreshSignal,
     required this.onSessionChanged,
+    this.onTransferStarted,
+    this.onTransfersObserved,
+    this.onTransferCancelled,
   });
 
   final LocalStorageService storage;
   final int refreshSignal;
   final VoidCallback onSessionChanged;
+  final ValueChanged<String>? onTransferStarted;
+  final void Function(String accountId, Set<String> transferIds, int rootItemCount)?
+      onTransfersObserved;
+  final ValueChanged<String>? onTransferCancelled;
 
   @override
   State<SeedrScreen> createState() => _SeedrScreenState();
@@ -228,11 +235,13 @@ class _SeedrScreenState extends State<SeedrScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF111C33),
-        title: const Text('Renommer ce profil Seedr'),
+        title: const Text('Renommer ce compte Seedr'),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(labelText: 'Nom du profil (ex : Moi, Sœur, Fille)'),
+          decoration: const InputDecoration(
+            labelText: 'Nom du compte (ex : Principal, Compte 2...)',
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
@@ -260,7 +269,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
         backgroundColor: const Color(0xFF111C33),
         title: const Text('Déconnecter ce compte Seedr ?'),
         content: Text(
-          'Voulez-vous retirer le profil « ${active.displayName} » de cet appareil ?',
+          'Voulez-vous retirer le compte « ${active.displayName} » de cet appareil ?',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
@@ -309,6 +318,13 @@ class _SeedrScreenState extends State<SeedrScreen> {
         _loadingFolder = false;
         _contents = data;
       });
+      if (folderId == null || folderId.isEmpty || folderId == '0') {
+        widget.onTransfersObserved?.call(
+          active.id,
+          data.torrents.map((t) => t.id).toSet(),
+          data.folders.length + data.files.length,
+        );
+      }
       _syncLiveTransferTimer();
     } on SeedrApiException catch (e) {
       if (!mounted) return;
@@ -385,6 +401,9 @@ class _SeedrScreenState extends State<SeedrScreen> {
     );
     if (confirmed != true) return;
     try {
+      if (type == 'torrent') {
+        widget.onTransferCancelled?.call(id);
+      }
       await _seedr.deleteItem(type: type, id: id);
       _showSnack('« $label » supprimé de Seedr.');
       await _loadFolder(folderId: _currentFolderId);
@@ -422,6 +441,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
     if (magnet == null || magnet.isEmpty) return;
     try {
       final msg = await _seedr.addMagnet(magnet, account: active);
+      widget.onTransferStarted?.call(active.id);
       _showSnack('☁️ ${active.displayName} : $msg');
       await _loadFolder(folderId: _currentFolderId);
     } catch (e) {
@@ -446,9 +466,9 @@ class _SeedrScreenState extends State<SeedrScreen> {
   }
 
   // -------------------------------------------------------------------
-  // Family Accounts Switcher Card
+  // Multi-Account Switcher Card
   // -------------------------------------------------------------------
-  Widget _buildFamilyAccountsBar() {
+  Widget _buildAccountsBar() {
     final accounts = _seedr.accounts;
     final activeId = _seedr.activeAccount?.id;
 
@@ -461,10 +481,10 @@ class _SeedrScreenState extends State<SeedrScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.group_outlined, color: Color(0xFF38BDF8), size: 18),
+                const Icon(Icons.switch_account_outlined, color: Color(0xFF38BDF8), size: 18),
                 const SizedBox(width: 6),
                 Text(
-                  'Comptes Seedr famille (${accounts.length})',
+                  'Comptes Seedr (${accounts.length})',
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
                 ),
                 const Spacer(),
@@ -509,7 +529,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
   }
 
   // -------------------------------------------------------------------
-  // Login View (Add First or Additional Family Account)
+  // Login View (Add First or Additional Account)
   // -------------------------------------------------------------------
   Widget _buildLoginView() {
     final pending = _pendingDeviceCode;
@@ -518,7 +538,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (hasExistingAccounts) _buildFamilyAccountsBar(),
+        if (hasExistingAccounts) _buildAccountsBar(),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -535,12 +555,12 @@ class _SeedrScreenState extends State<SeedrScreen> {
                         children: [
                           Text(
                             hasExistingAccounts
-                                ? 'Ajouter un compte Seedr famille'
+                                ? 'Ajouter un compte Seedr'
                                 : 'Connexion à Seedr.cc',
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                           ),
                           const Text(
-                            'Connectez un ou plusieurs comptes familiaux et choisissez celui à utiliser selon le quota disponible.',
+                            'Connectez un ou plusieurs comptes Seedr et choisissez celui à utiliser selon le quota disponible.',
                             style: TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
                           ),
                         ],
@@ -565,7 +585,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
                 TextField(
                   controller: _labelCtrl,
                   decoration: const InputDecoration(
-                    labelText: 'Nom du profil (ex : Moi, Sœur, Fille)',
+                    labelText: 'Nom du compte (ex : Principal, Compte 2...)',
                     prefixIcon: Icon(Icons.badge_outlined),
                   ),
                 ),
@@ -597,7 +617,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
                 const SizedBox(height: 16),
                 if (_useDeviceFlow) ...[
                   const Text(
-                    'Méthode la plus sûre : aucun mot de passe n\'est saisi dans l\'application. Un code court vous permet d\'autoriser SafeTorrent depuis seedr.cc/devices.',
+                    'Méthode la plus sûre : aucun mot de passe n\'est saisi dans l\'application. Un code court vous permet d\'autoriser Torrent Seeder depuis seedr.cc/devices.',
                     style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                   ),
                   const SizedBox(height: 14),
@@ -765,7 +785,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildFamilyAccountsBar(),
+          _buildAccountsBar(),
 
           // Active Account & Quota Card
           Card(
@@ -798,7 +818,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Renommer ce profil',
+                        tooltip: 'Renommer ce compte',
                         onPressed: () => _promptRenameAccount(s),
                         icon: const Icon(Icons.edit_outlined, size: 20),
                       ),

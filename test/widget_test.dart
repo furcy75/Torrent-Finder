@@ -7,9 +7,10 @@ import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/ui/widgets/country_flag.dart';
 
 void main() {
-  testWidgets('SafeTorrent launches with Films/Séries toggle, Seedr multi-accounts, and no TorBox/history',
+  testWidgets(
+      'Torrent Seeder launches with Films/Séries toggle, Donate icon, Seedr multi-accounts, and no TorBox/history',
       (tester) async {
-    final tmpDir = Directory.systemTemp.createTempSync('safetorrent_widget_');
+    final tmpDir = Directory.systemTemp.createTempSync('torrent_seeder_widget_');
     addTearDown(() {
       if (tmpDir.existsSync()) tmpDir.deleteSync(recursive: true);
     });
@@ -17,10 +18,10 @@ void main() {
     final storage = LocalStorageService(overrideDirectory: tmpDir);
     await tester.runAsync(() => storage.load());
 
-    await tester.pumpWidget(SafeTorrentApp(storage: storage));
+    await tester.pumpWidget(TorrentSeederApp(storage: storage));
     await tester.pumpAndSettle();
 
-    expect(find.text('SafeTorrent'), findsOneWidget);
+    expect(find.text('Torrent Seeder'), findsOneWidget);
     expect(find.text('Films'), findsOneWidget);
     expect(find.text('Séries TV'), findsOneWidget);
     expect(find.text('Identifier le film (AlloCiné / Bases)'), findsOneWidget);
@@ -33,10 +34,18 @@ void main() {
     expect(find.text('Année'), findsNothing);
     expect(find.text('TorBox'), findsNothing);
 
-    // Switch to Seedr tab and verify family profile label + both auth flows
+    // Donate icon opens GitHub Sponsors dialog
+    await tester.tap(find.byIcon(Icons.volunteer_activism_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('Soutenir Torrent Seeder'), findsOneWidget);
+    expect(find.text('Faire un don (GitHub Sponsors)'), findsOneWidget);
+    await tester.tap(find.text('Plus tard'));
+    await tester.pumpAndSettle();
+
+    // Switch to Seedr tab and verify general account label + both auth flows
     await tester.tap(find.text('Seedr'));
     await tester.pumpAndSettle();
-    expect(find.text('Nom du profil (ex : Moi, Sœur, Fille)'), findsOneWidget);
+    expect(find.text('Nom du compte (ex : Principal, Compte 2...)'), findsOneWidget);
     expect(find.text('Code Appareil (Recommandé)'), findsOneWidget);
     expect(find.text('Email & Mot de passe'), findsOneWidget);
 

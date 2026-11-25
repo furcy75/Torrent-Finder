@@ -21,7 +21,7 @@ class SandboxWorker {
   static const int maxRedirects = 5;
   static const Duration connectTimeout = Duration(seconds: 10);
   static const Duration totalTimeout = Duration(seconds: 18);
-  static const String userAgent = 'SafeTorrent/1.0 (Standalone-Sandbox)';
+  static const String userAgent = 'TorrentSeeder/2.0 (Standalone-Sandbox)';
 
   static Future<SandboxExecutionResult> fetchAndSanitize({
     String? torrentUrl,

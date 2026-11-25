@@ -20,12 +20,14 @@ class SandboxDialog extends StatefulWidget {
     required this.settings,
     this.storage,
     this.onSentToSeedr,
+    this.onSeedrTransferStarted,
   });
 
   final TorrentResult torrent;
   final AppSettings settings;
   final LocalStorageService? storage;
   final VoidCallback? onSentToSeedr;
+  final ValueChanged<String>? onSeedrTransferStarted;
 
   @override
   State<SandboxDialog> createState() => _SandboxDialogState();
@@ -130,6 +132,7 @@ class _SandboxDialogState extends State<SandboxDialog> {
         account: chosen,
       );
       await storage.setActiveSeedrAccount(chosen.id);
+      widget.onSeedrTransferStarted?.call(chosen.id);
       if (!mounted) return;
       setState(() => _savedMessage = '☁️ Envoyé sur Seedr (${chosen.displayName}) : $msg');
       widget.onSentToSeedr?.call();

@@ -15,7 +15,7 @@ class SeedrApiException implements Exception {
   String toString() => message;
 }
 
-/// Complete Seedr.cc API client supporting multiple family accounts and BOTH
+/// Complete Seedr.cc API client supporting multiple Seedr accounts and BOTH
 /// authentication flows:
 /// 1. Device Code OAuth (`seedr.cc/devices`, auto-refreshable via `device_code`, zero password stored)
 /// 2. Email + Password OAuth (`oauth_test/token.php`, auto-refreshable via `refresh_token`, password never saved)
@@ -32,7 +32,7 @@ class SeedrService {
   static const String _deviceClientId = 'seedr_xbmc';
   static const String _passwordClientId = 'seedr_chrome';
   static const Map<String, String> _headers = {
-    'User-Agent': 'SafeTorrent/1.6 (Standalone)',
+    'User-Agent': 'TorrentSeeder/2.0 (Standalone)',
   };
 
   List<SeedrSession> get accounts => storage.seedrAccounts;
@@ -264,30 +264,32 @@ class SeedrService {
   }
 
   // -------------------------------------------------------------------
-  // Quota Checking Across All Family Accounts (Manual Picker)
+  // Quota & Active Transfer Checking Across All Accounts (Manual Picker)
   // -------------------------------------------------------------------
   Future<SeedrAccountQuota> fetchAccountQuota(SeedrSession account) async {
     try {
       return await _withAutoRefresh(account, (token, current) async {
-        final uri = buildResourceUri(accessToken: token, func: 'get_memory_bandwidth');
-        final resp = await http.get(uri, headers: _headers).timeout(_timeout);
-        final data = _checkAuthAndParse(resp);
-        var used = (data['space_used'] as num?)?.toInt();
-        var max = (data['space_max'] as num?)?.toInt();
+        // list_contents(0) returns space_used, space_max, AND active torrents in one call
+        final folderUri = buildResourceUri(accessToken: token, func: 'list_contents');
+        final folderResp = await http
+            .post(
+              folderUri,
+              headers: _headers,
+              body: {'content_type': 'folder', 'content_id': '0'},
+            )
+            .timeout(_timeout);
+        final folderData = _checkAuthAndParse(folderResp);
+        final contents = SeedrFolderContents.fromJson(folderData);
 
-        // Fallback to list_contents if get_memory_bandwidth didn't return space fields
-        if (used == null || max == null || max <= 0) {
-          final folderUri = buildResourceUri(accessToken: token, func: 'list_contents');
-          final folderResp = await http
-              .post(
-                folderUri,
-                headers: _headers,
-                body: {'content_type': 'folder', 'content_id': '0'},
-              )
-              .timeout(_timeout);
-          final folderData = _checkAuthAndParse(folderResp);
-          used = (folderData['space_used'] as num?)?.toInt();
-          max = (folderData['space_max'] as num?)?.toInt();
+        var used = contents.spaceMax > 0 ? contents.spaceUsed : null;
+        var max = contents.spaceMax > 0 ? contents.spaceMax : null;
+
+        if (used == null || max == null) {
+          final memUri = buildResourceUri(accessToken: token, func: 'get_memory_bandwidth');
+          final memResp = await http.get(memUri, headers: _headers).timeout(_timeout);
+          final memData = _checkAuthAndParse(memResp);
+          used = (memData['space_used'] as num?)?.toInt();
+          max = (memData['space_max'] as num?)?.toInt();
         }
 
         var updatedAcc = current;
@@ -300,6 +302,7 @@ class SeedrService {
           account: updatedAcc,
           spaceUsed: used ?? updatedAcc.lastSpaceUsed,
           spaceMax: max ?? updatedAcc.lastSpaceMax,
+          activeDownloadsCount: contents.torrents.length,
         );
       });
     } catch (e) {

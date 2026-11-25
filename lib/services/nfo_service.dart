@@ -22,7 +22,7 @@ class NfoService {
   static const Duration _timeout = Duration(seconds: 10);
   static const int _maxNfoChars = 65536;
   static const Map<String, String> _headers = {
-    'User-Agent': 'SafeTorrent/1.1 (Standalone-NFO)',
+    'User-Agent': 'TorrentSeeder/2.0 (Standalone-NFO)',
   };
 
   Future<NfoDetails> fetchDetails(TorrentResult torrent) async {

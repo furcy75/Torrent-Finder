@@ -1,4 +1,4 @@
-name: Build SafeTorrent (Android APK, Windows EXE, Linux)
+name: Build Torrent Seeder (Android APK, Windows EXE, Linux)
 
 on:
   push:
@@ -49,24 +49,24 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate Android runner, app icon & SafeTorrent manifest
+      - name: Generate Android runner, app icon & Torrent Seeder manifest
         run: |
           flutter create --platforms=android --org com.safetorrent --project-name safetorrent .
           python3 -m pip install --quiet pillow
           python3 installer/generate_icons.py --platform android
-          python3 -c 'from pathlib import Path; m = Path("android/app/src/main/AndroidManifest.xml"); t = m.read_text(encoding="utf-8"); t = t.replace("<application", "    <uses-permission android:name=\"android.permission.INTERNET\" />\n    <application", 1) if "android.permission.INTERNET" not in t else t; m.write_text(t.replace("android:label=\"safetorrent\"", "android:label=\"SafeTorrent\""), encoding="utf-8")'
+          python3 -c 'from pathlib import Path; m = Path("android/app/src/main/AndroidManifest.xml"); t = m.read_text(encoding="utf-8"); t = t.replace("<application", "    <uses-permission android:name=\"android.permission.INTERNET\" />\n    <application", 1) if "android.permission.INTERNET" not in t else t; m.write_text(t.replace("android:label=\"safetorrent\"", "android:label=\"Torrent Seeder\""), encoding="utf-8")'
 
       - name: Build Release APK
         run: |
           flutter pub get
           flutter build apk --release
-          cp build/app/outputs/flutter-apk/app-release.apk SafeTorrent-Android.apk
+          cp build/app/outputs/flutter-apk/app-release.apk TorrentSeeder-Android.apk
 
       - name: Upload Android APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SafeTorrent-Android-APK
-          path: SafeTorrent-Android.apk
+          name: TorrentSeeder-Android-APK
+          path: TorrentSeeder-Android.apk
 
   build-windows:
     name: Build Standalone Windows EXE & Portable ZIP
@@ -111,7 +111,7 @@ jobs:
             }
           }
 
-          Compress-Archive -Path "$releaseDir\*" -DestinationPath SafeTorrent-Windows-Portable.zip
+          Compress-Archive -Path "$releaseDir\*" -DestinationPath TorrentSeeder-Windows-Portable.zip
 
       - name: Package single-file Windows Setup EXE (Inno Setup)
         shell: pwsh
@@ -125,10 +125,10 @@ jobs:
       - name: Upload Windows EXE & Portable ZIP artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: SafeTorrent-Windows-x64
+          name: TorrentSeeder-Windows-x64
           path: |
-            SafeTorrent-Windows-Setup.exe
-            SafeTorrent-Windows-Portable.zip
+            TorrentSeeder-Windows-Setup.exe
+            TorrentSeeder-Windows-Portable.zip
 
   build-linux:
     name: Build Standalone Linux App
@@ -153,17 +153,17 @@ jobs:
           python3 installer/generate_icons.py --platform linux
           flutter pub get
           flutter build linux --release
-          tar -czf SafeTorrent-Linux-x64.tar.gz -C build/linux/x64/release/bundle .
+          tar -czf TorrentSeeder-Linux-x64.tar.gz -C build/linux/x64/release/bundle .
           chmod +x installer/build_deb.sh
-          bash installer/build_deb.sh 1.6.0
+          bash installer/build_deb.sh 2.0.0
 
       - name: Upload Linux DEB & tar.gz artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: SafeTorrent-Linux-x64
+          name: TorrentSeeder-Linux-x64
           path: |
-            SafeTorrent-Linux-amd64.deb
-            SafeTorrent-Linux-x64.tar.gz
+            TorrentSeeder-Linux-amd64.deb
+            TorrentSeeder-Linux-x64.tar.gz
 
   publish-release:
     name: Publish GitHub Release (on tag v*)
@@ -181,9 +181,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release-assets/SafeTorrent-Android.apk
-            release-assets/SafeTorrent-Windows-Setup.exe
-            release-assets/SafeTorrent-Windows-Portable.zip
-            release-assets/SafeTorrent-Linux-amd64.deb
-            release-assets/SafeTorrent-Linux-x64.tar.gz
+            release-assets/TorrentSeeder-Android.apk
+            release-assets/TorrentSeeder-Windows-Setup.exe
+            release-assets/TorrentSeeder-Windows-Portable.zip
+            release-assets/TorrentSeeder-Linux-amd64.deb
+            release-assets/TorrentSeeder-Linux-x64.tar.gz
           generate_release_notes: true

@@ -304,7 +304,7 @@ class AllocineService {
     final uri = Uri.https('api.tvmaze.com', '/search/shows', {'q': query});
     try {
       final resp = await http
-          .get(uri, headers: const {'User-Agent': 'SafeTorrent/1.4 (Standalone)'})
+          .get(uri, headers: const {'User-Agent': 'TorrentSeeder/2.0 (Standalone)'})
           .timeout(_timeout);
       if (resp.statusCode != 200) return [];
       final list = jsonDecode(resp.body);
@@ -364,7 +364,7 @@ class AllocineService {
     );
     try {
       final resp = await http
-          .get(uri, headers: const {'User-Agent': 'SafeTorrent/1.4 (Standalone)'})
+          .get(uri, headers: const {'User-Agent': 'TorrentSeeder/2.0 (Standalone)'})
           .timeout(_timeout);
       if (resp.statusCode != 200) return null;
       final data = jsonDecode(resp.body) as Map<String, dynamic>;
@@ -570,7 +570,7 @@ class AllocineService {
     int? year,
     int limit = 6,
   }) async {
-    const headers = {'User-Agent': 'SafeTorrent/1.4 (Standalone)'};
+    const headers = {'User-Agent': 'TorrentSeeder/2.0 (Standalone)'};
     final searchLanguages = ['fr', 'en', 'es'];
     final candidateIds = <String>[];
     final seenIds = <String>{};
@@ -706,7 +706,7 @@ class AllocineService {
     );
     try {
       final resp =
-          await http.get(uri, headers: {'User-Agent': 'SafeTorrent/1.4'}).timeout(_timeout);
+          await http.get(uri, headers: {'User-Agent': 'TorrentSeeder/2.0'}).timeout(_timeout);
       if (resp.statusCode != 200) return [];
       final list = (jsonDecode(resp.body) as Map<String, dynamic>)['d'] as List? ?? [];
       final out = <MovieSuggestion>[];

@@ -36,7 +36,7 @@ class SearchSummary {
 class IndexersService {
   static const Duration _timeout = Duration(seconds: 12);
   static const Map<String, String> _headers = {
-    'User-Agent': 'SafeTorrent/1.4 (Standalone)',
+    'User-Agent': 'TorrentSeeder/2.0 (Standalone)',
   };
 
   static const List<String> _publicTrackers = [

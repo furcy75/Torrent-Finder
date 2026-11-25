@@ -4,9 +4,9 @@ import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/services/release_parser.dart';
 import 'package:safetorrent/services/seedr_service.dart';
 
-/// Displays all connected family Seedr accounts with their live available quota
-/// compared against [torrentSizeBytes], and lets the user manually choose which
-/// account should receive the torrent.
+/// Displays all connected Seedr accounts with their live available quota and
+/// whether a file is currently downloading, and lets the user manually choose
+/// which account should receive the torrent.
 class SeedrPickerDialog extends StatefulWidget {
   const SeedrPickerDialog({
     super.key,
@@ -47,7 +47,6 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
   @override
   void initState() {
     super.initState();
-    // Show cached quotas immediately while live refresh loads
     _quotas = widget.storage.seedrAccounts
         .map(
           (a) => SeedrAccountQuota(
@@ -64,12 +63,18 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
     setState(() => _loading = true);
     final fresh = await _seedr.fetchAllAccountsQuota();
     if (!mounted) return;
-    // Sort visually: accounts with enough space first, then highest free space
+    // Sort visually: fits & idle first, then fits & busy, then unknown, then insufficient quota
     fresh.sort((a, b) {
-      final fitA = a.canFit(widget.torrentSizeBytes);
-      final fitB = b.canFit(widget.torrentSizeBytes);
-      int rank(bool? fit) => fit == true ? 0 : (fit == null ? 1 : 2);
-      final cmp = rank(fitA).compareTo(rank(fitB));
+      int rank(SeedrAccountQuota q) {
+        final fit = q.canFit(widget.torrentSizeBytes);
+        if (fit == true && !q.hasActiveDownloads) return 0;
+        if (fit == true) return 1;
+        if (fit == null && !q.hasActiveDownloads) return 2;
+        if (fit == null) return 3;
+        return 4;
+      }
+
+      final cmp = rank(a).compareTo(rank(b));
       if (cmp != 0) return cmp;
       return (b.spaceFree ?? -1).compareTo(a.spaceFree ?? -1);
     });
@@ -140,7 +145,7 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
               const SizedBox(height: 12),
               Text(
                 _loading
-                    ? 'Vérification du quota disponible sur chaque compte...'
+                    ? 'Vérification du quota et des téléchargements en cours...'
                     : 'Sélectionnez le compte Seedr vers lequel envoyer ce torrent :',
                 style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
               ),
@@ -213,7 +218,7 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.person_outline, color: Color(0xFF38BDF8), size: 20),
+                  const Icon(Icons.account_circle_outlined, color: Color(0xFF38BDF8), size: 22),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
@@ -242,16 +247,56 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
                 ],
               ),
               const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: badgeBg,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  badgeText,
-                  style: TextStyle(color: badgeFg, fontSize: 11.5, fontWeight: FontWeight.w700),
-                ),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: badgeBg,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: TextStyle(color: badgeFg, fontSize: 11.5, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  if (q.hasActiveDownloads)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF78350F),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        q.activeDownloadsCount == 1
+                            ? '⏳ Téléchargement en cours'
+                            : '⏳ ${q.activeDownloadsCount} téléchargements en cours',
+                        style: const TextStyle(
+                          color: Color(0xFFFDE68A),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    )
+                  else if (!_loading && q.error == null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0C4A6E),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        '✓ Aucun transfert en cours',
+                        style: TextStyle(
+                          color: Color(0xFF7DD3FC),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               if (q.spaceMax != null && q.spaceMax! > 0 && q.spaceUsed != null) ...[
                 const SizedBox(height: 8),
