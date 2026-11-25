@@ -106,7 +106,7 @@ class NfoService {
 
       final buf = StringBuffer();
       buf.writeln(torrent.nfoText ?? '');
-      buf.writeln('${'─' * 42}');
+      buf.writeln('─' * 42);
       if (movie['imdb_code'] != null) buf.writeln('IMDb      : ${movie['imdb_code']}');
       if (movie['rating'] != null) buf.writeln('Note IMDb : ${movie['rating']} / 10');
       if (movie['runtime'] != null && movie['runtime'] != 0) {
