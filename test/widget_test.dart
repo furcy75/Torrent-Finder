@@ -26,10 +26,21 @@ void main() {
     expect(find.text('Identifier le film (AlloCiné / Bases)'), findsOneWidget);
     expect(find.text('Rechercher'), findsOneWidget);
     expect(find.text('Plus tard'), findsOneWidget);
+    expect(find.text('Seedr'), findsOneWidget);
 
     // History and year field are removed
     expect(find.text('Historique'), findsNothing);
     expect(find.text('Année'), findsNothing);
+
+    // Switch to Seedr tab and verify both auth flows exist
+    await tester.tap(find.text('Seedr'));
+    await tester.pumpAndSettle();
+    expect(find.text('Code Appareil (Recommandé)'), findsOneWidget);
+    expect(find.text('Email & Mot de passe'), findsOneWidget);
+
+    // Return to Search tab
+    await tester.tap(find.text('Rechercher'));
+    await tester.pumpAndSettle();
 
     // Switch to TV Series mode
     await tester.tap(find.text('Séries TV'));

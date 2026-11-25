@@ -7,6 +7,7 @@ import 'package:safetorrent/services/allocine_service.dart';
 import 'package:safetorrent/services/indexers_service.dart';
 import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/services/release_parser.dart';
+import 'package:safetorrent/services/seedr_service.dart';
 import 'package:safetorrent/ui/home_shell.dart';
 import 'package:safetorrent/ui/nfo_dialog.dart';
 import 'package:safetorrent/ui/sandbox_dialog.dart';
@@ -23,12 +24,14 @@ class SearchScreen extends StatefulWidget {
     required this.pendingRequest,
     required this.triggerId,
     required this.onDataChanged,
+    this.onOpenSeedr,
   });
 
   final LocalStorageService storage;
   final PendingSearchRequest? pendingRequest;
   final int triggerId;
   final VoidCallback onDataChanged;
+  final VoidCallback? onOpenSeedr;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -465,8 +468,39 @@ class _SearchScreenState extends State<SearchScreen> {
       builder: (_) => SandboxDialog(
         torrent: item,
         settings: widget.storage.settings,
+        storage: widget.storage,
+        onSentToSeedr: widget.onOpenSeedr,
       ),
     );
+  }
+
+  Future<void> _sendToSeedr(TorrentResult item) async {
+    final seedr = SeedrService(storage: widget.storage);
+    if (!seedr.isConnected) {
+      _showSnack('Connectez votre compte dans l\'onglet Seedr pour envoyer des torrents.');
+      widget.onOpenSeedr?.call();
+      return;
+    }
+    final magnet = item.magnetUrl;
+    if (magnet == null || magnet.isEmpty) {
+      _showSnack('Utilisez « Bac à sable (.torrent) » pour envoyer ce fichier vers Seedr.');
+      return;
+    }
+    try {
+      _showSnack('Envoi vers Seedr en cours...');
+      final msg = await seedr.addMagnet(magnet);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('☁️ Envoyé vers Seedr : $msg'),
+          action: widget.onOpenSeedr != null
+              ? SnackBarAction(label: 'Ouvrir Seedr', onPressed: widget.onOpenSeedr!)
+              : null,
+        ),
+      );
+    } catch (e) {
+      _showSnack('$e');
+    }
   }
 
   Future<void> _openNfo(TorrentResult item) async {
@@ -1465,6 +1499,12 @@ class _SearchScreenState extends State<SearchScreen> {
                     onPressed: isBlocked ? null : () => _openSandbox(item),
                     icon: const Icon(Icons.verified_user_outlined, size: 18),
                     label: const Text('Bac à sable (.torrent)'),
+                  ),
+                if (item.magnetUrl != null)
+                  OutlinedButton.icon(
+                    onPressed: isBlocked ? null : () => _sendToSeedr(item),
+                    icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                    label: const Text('Envoyer vers Seedr'),
                   ),
                 OutlinedButton.icon(
                   onPressed: () => _openNfo(item),

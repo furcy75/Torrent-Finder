@@ -1,7 +1,7 @@
 name: safetorrent
-description: "Application 100% autonome (Android APK, Windows, Linux) avec bac à sable anti-virus pour rechercher des fichiers .torrent de films et séries."
+description: "Application 100% autonome (Android APK, Windows, Linux) avec bac à sable anti-virus et intégration Seedr pour films et séries."
 publish_to: 'none'
-version: 1.4.0+6
+version: 1.5.0+7
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -14,6 +14,7 @@ dependencies:
   http: ^1.2.2
   path_provider: ^2.1.4
   share_plus: ^10.0.2
+  url_launcher: ^6.3.1
   xml: ^6.5.0
 
 dev_dependencies:

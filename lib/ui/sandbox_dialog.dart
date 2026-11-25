@@ -7,7 +7,9 @@ import 'package:safetorrent/models/app_settings.dart';
 import 'package:safetorrent/models/safety_report.dart';
 import 'package:safetorrent/models/torrent_result.dart';
 import 'package:safetorrent/sandbox/sandbox_worker.dart';
+import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/services/release_parser.dart';
+import 'package:safetorrent/services/seedr_service.dart';
 import 'package:share_plus/share_plus.dart';
 
 class SandboxDialog extends StatefulWidget {
@@ -15,10 +17,14 @@ class SandboxDialog extends StatefulWidget {
     super.key,
     required this.torrent,
     required this.settings,
+    this.storage,
+    this.onSentToSeedr,
   });
 
   final TorrentResult torrent;
   final AppSettings settings;
+  final LocalStorageService? storage;
+  final VoidCallback? onSentToSeedr;
 
   @override
   State<SandboxDialog> createState() => _SandboxDialogState();
@@ -27,6 +33,7 @@ class SandboxDialog extends StatefulWidget {
 class _SandboxDialogState extends State<SandboxDialog> {
   SandboxExecutionResult? _result;
   bool _saving = false;
+  bool _sendingSeedr = false;
   String? _savedMessage;
 
   @override
@@ -66,8 +73,6 @@ class _SandboxDialogState extends State<SandboxDialog> {
     try {
       final fileName = _safeFileName(rawName);
       if (Platform.isAndroid || Platform.isIOS) {
-        // Save in private app cache & open native OS share/open sheet
-        // (sends cleanly to LibreTorrent, Flud, qBittorrent, or Files app with zero risky permissions)
         final tmpDir = await getTemporaryDirectory();
         final file = File('${tmpDir.path}${Platform.pathSeparator}$fileName');
         await file.writeAsBytes(bytes, flush: true);
@@ -81,7 +86,6 @@ class _SandboxDialogState extends State<SandboxDialog> {
           });
         }
       } else {
-        // Windows / Linux: save directly to user Downloads folder
         final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
         final file = File('${dir.path}${Platform.pathSeparator}$fileName');
         await file.writeAsBytes(bytes, flush: true);
@@ -100,10 +104,29 @@ class _SandboxDialogState extends State<SandboxDialog> {
     }
   }
 
+  Future<void> _sendSanitizedToSeedr(Uint8List bytes, String rawName) async {
+    final storage = widget.storage;
+    if (storage == null) return;
+    setState(() => _sendingSeedr = true);
+    try {
+      final seedr = SeedrService(storage: storage);
+      final msg = await seedr.addTorrentBytes(bytes, _safeFileName(rawName));
+      if (!mounted) return;
+      setState(() => _savedMessage = '☁️ Envoyé sur Seedr : $msg');
+      widget.onSentToSeedr?.call();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _savedMessage = 'Erreur Seedr : $e');
+    } finally {
+      if (mounted) setState(() => _sendingSeedr = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final res = _result;
     final report = res?.report;
+    final seedrReady = widget.storage?.seedrSession?.isValid == true;
 
     return AlertDialog(
       backgroundColor: const Color(0xFF111C33),
@@ -242,14 +265,25 @@ class _SandboxDialogState extends State<SandboxDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Fermer'),
         ),
-        if (report != null && report.safeToDownload && res?.sanitizedBytes != null)
+        if (report != null && report.safeToDownload && res?.sanitizedBytes != null) ...[
+          if (seedrReady)
+            OutlinedButton.icon(
+              onPressed: _sendingSeedr
+                  ? null
+                  : () => _sendSanitizedToSeedr(res!.sanitizedBytes!, widget.torrent.title),
+              icon: _sendingSeedr
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.cloud_upload_outlined, size: 17),
+              label: const Text('Envoyer vers Seedr'),
+            ),
           FilledButton.icon(
             onPressed: _saving
                 ? null
-                : () => _exportSanitizedTorrent(
-                      res!.sanitizedBytes!,
-                      widget.torrent.title,
-                    ),
+                : () => _exportSanitizedTorrent(res!.sanitizedBytes!, widget.torrent.title),
             icon: const Icon(Icons.download_done),
             label: Text(
               Platform.isAndroid || Platform.isIOS
@@ -257,6 +291,7 @@ class _SandboxDialogState extends State<SandboxDialog> {
                   : 'Enregistrer .torrent vérifié',
             ),
           ),
+        ],
       ],
     );
   }
@@ -279,7 +314,7 @@ class _SandboxDialogState extends State<SandboxDialog> {
           const Color(0xFFFCA5A5),
         ),
       SafetyStatus.unverified => (
-          'ℹ️ .torrent indisponible sur les caches (utilisez Magnet)',
+          'ℹ️ .torrent indisponible sur les caches (utilisez Magnet ou Seedr)',
           const Color(0xFF1E293B),
           const Color(0xFFCBD5E1),
         ),

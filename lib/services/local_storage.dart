@@ -3,11 +3,13 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:safetorrent/models/app_settings.dart';
+import 'package:safetorrent/models/seedr_models.dart';
 import 'package:safetorrent/models/watchlist_item.dart';
 
 /// 100% on-device local persistence (Android, Windows, Linux — zero server/cloud).
 ///
-/// Stores only user settings and the "Plus tard" watchlist (no search history).
+/// Stores user settings, the "Plus tard" watchlist, and optional Seedr OAuth tokens
+/// (never stores passwords).
 class LocalStorageService {
   LocalStorageService({Directory? overrideDirectory})
       : _overrideDirectory = overrideDirectory;
@@ -16,6 +18,7 @@ class LocalStorageService {
 
   AppSettings settings = const AppSettings();
   List<WatchlistItem> watchlist = [];
+  SeedrSession? seedrSession;
   bool isLoaded = false;
 
   Future<File> _storageFile() async {
@@ -43,6 +46,10 @@ class LocalStorageService {
             .map(WatchlistItem.fromJson)
             .toList();
       }
+      if (decoded['seedrSession'] is Map<String, dynamic>) {
+        final s = SeedrSession.fromJson(decoded['seedrSession'] as Map<String, dynamic>);
+        seedrSession = s.isValid ? s : null;
+      }
     } catch (_) {
       // Fall back cleanly to defaults if file is empty or unreadable
     } finally {
@@ -55,6 +62,7 @@ class LocalStorageService {
     final payload = {
       'settings': settings.toJson(),
       'watchlist': watchlist.map((e) => e.toJson()).toList(),
+      'seedrSession': seedrSession?.toJson(),
     };
     final tmp = File('${file.path}.tmp');
     await tmp.writeAsString(jsonEncode(payload));
@@ -63,6 +71,11 @@ class LocalStorageService {
 
   Future<void> updateSettings(AppSettings updated) async {
     settings = updated;
+    await _save();
+  }
+
+  Future<void> setSeedrSession(SeedrSession? session) async {
+    seedrSession = (session != null && session.isValid) ? session : null;
     await _save();
   }
 

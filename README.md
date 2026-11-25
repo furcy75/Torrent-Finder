@@ -61,6 +61,11 @@ Récupérez directement la dernière version prête à l'emploi depuis [**GitHub
   - **Qualité** : `🚫 Sans CAM/TS` *(activé par défaut)*
 - **Visionneuse NFO / Détails sécurisée** : consulte le NFO/MediaInfo en texte brut monospace (APIBay `t.php`, fiche YTS, `.nfo` Internet Archive) sans jamais rendre de HTML ou JavaScript.
 
+### ☁️ Intégration Seedr.cc en direct (optionnelle)
+- **Deux modes de connexion** : **Code Appareil** (`seedr.cc/devices`, jeton longue durée sans mot de passe) ou **Email & Mot de passe** (seul le jeton OAuth est conservé localement, jamais votre mot de passe).
+- **Envoi en 1 clic** depuis les résultats de recherche ou depuis la modale **Bac à sable** (upload direct du fichier `.torrent` vérifié et assaini).
+- **Gestion en direct du compte** dans l'onglet **Seedr** : jauge de quota utilisé/libre, suivi auto-actualisé des transferts en cours, explorateur de dossiers/fichiers, téléchargement direct HTTPS, archive `.zip` de dossier, copie du lien direct (VLC) et suppression en un clic.
+
 ### 📌 Liste « Plus tard » (sans historique superflu)
 - Aucun historique de navigation inutile n'est enregistré.
 - Sauvegardez en un clic les films non trouvés ou les séries en attente d'une nouvelle saison dans **Plus tard** : leur **vignette**, leurs titres multilingues et la **date de sortie de la saison suivante** sont conservés (avec bouton **Actualiser date**).

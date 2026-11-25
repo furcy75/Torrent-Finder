@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:safetorrent/models/movie_suggestion.dart';
 import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/ui/search_screen.dart';
+import 'package:safetorrent/ui/seedr_screen.dart';
 import 'package:safetorrent/ui/settings_dialog.dart';
 import 'package:safetorrent/ui/watchlist_screen.dart';
 
@@ -29,6 +30,7 @@ class _HomeShellState extends State<HomeShell> {
   bool _ready = false;
   PendingSearchRequest? _pendingSearch;
   int _searchTriggerId = 0;
+  int _seedrRefreshSignal = 0;
 
   @override
   void initState() {
@@ -54,6 +56,13 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
+  void _openSeedrTab({bool refresh = true}) {
+    setState(() {
+      if (refresh) _seedrRefreshSignal++;
+      _tabIndex = 2;
+    });
+  }
+
   Future<void> _openSettings() async {
     await showDialog<void>(
       context: context,
@@ -65,6 +74,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final watchlistCount = widget.storage.watchlist.length;
+    final seedrConnected = widget.storage.seedrSession?.isValid == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -125,18 +135,29 @@ class _HomeShellState extends State<HomeShell> {
                   pendingRequest: _pendingSearch,
                   triggerId: _searchTriggerId,
                   onDataChanged: () => setState(() {}),
+                  onOpenSeedr: () => _openSeedrTab(refresh: true),
                 ),
                 WatchlistScreen(
                   storage: widget.storage,
                   onRerunSearch: _triggerSearch,
                   onDataChanged: () => setState(() {}),
                 ),
+                SeedrScreen(
+                  storage: widget.storage,
+                  refreshSignal: _seedrRefreshSignal,
+                  onSessionChanged: () => setState(() {}),
+                ),
               ],
             ),
       bottomNavigationBar: NavigationBar(
         backgroundColor: const Color(0xFF0F172A),
         selectedIndex: _tabIndex,
-        onDestinationSelected: (idx) => setState(() => _tabIndex = idx),
+        onDestinationSelected: (idx) {
+          setState(() {
+            _tabIndex = idx;
+            if (idx == 2) _seedrRefreshSignal++;
+          });
+        },
         destinations: [
           const NavigationDestination(
             icon: Icon(Icons.search),
@@ -149,6 +170,15 @@ class _HomeShellState extends State<HomeShell> {
               child: const Icon(Icons.bookmark_outline),
             ),
             label: 'Plus tard',
+          ),
+          NavigationDestination(
+            icon: Badge(
+              isLabelVisible: seedrConnected,
+              backgroundColor: const Color(0xFF22C55E),
+              smallSize: 8,
+              child: const Icon(Icons.cloud_outlined),
+            ),
+            label: 'Seedr',
           ),
         ],
       ),
