@@ -2,7 +2,7 @@
 [Setup]
 AppId={{8D6B4A7E-9A51-4D8C-B9B5-4C7D29D7A101}
 AppName=SafeTorrent
-AppVersion=1.0.1
+AppVersion=1.1.0
 AppPublisher=SafeTorrent
 DefaultDirName={autopf}\SafeTorrent
 DefaultGroupName=SafeTorrent

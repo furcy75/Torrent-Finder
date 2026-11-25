@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:safetorrent/models/torrent_result.dart';
 import 'package:safetorrent/models/watchlist_item.dart';
 import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/ui/home_shell.dart';
@@ -78,9 +79,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 (item) => Card(
                   margin: const EdgeInsets.only(bottom: 10),
                   child: ListTile(
-                    title: Text(item.query, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    title: Text(
+                      item.year != null ? '${item.query} (${item.year})' : item.query,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
                     subtitle: Text(
-                      '${item.language.flag} ${item.language.label} • ${item.resultCount} résultat(s)'
+                      '${LanguageFilter.formatFlags(item.languages)} • ${item.resultCount} résultat(s)'
                       '${item.originalTitle != null ? ' • VO : ${item.originalTitle}' : ''}',
                     ),
                     trailing: Row(
@@ -93,7 +97,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             PendingSearchRequest(
                               query: item.query,
                               originalTitle: item.originalTitle,
-                              language: item.language,
+                              year: item.year,
+                              languages: item.languages,
                             ),
                           ),
                         ),
@@ -106,7 +111,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 id: '${DateTime.now().microsecondsSinceEpoch}',
                                 titleFr: item.query,
                                 titleOriginal: item.originalTitle,
-                                language: item.language,
+                                year: item.year,
+                                languages: item.languages,
                                 createdAt: DateTime.now().toUtc(),
                               ),
                             );

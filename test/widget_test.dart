@@ -5,7 +5,7 @@ import 'package:safetorrent/main.dart';
 import 'package:safetorrent/services/local_storage.dart';
 
 void main() {
-  testWidgets('SafeTorrent launches with movie search, AlloCiné button, and language flags',
+  testWidgets('SafeTorrent launches with movie+year fields, multilingual lookup, and multi-flags',
       (tester) async {
     final tmpDir = Directory.systemTemp.createTempSync('safetorrent_widget_');
     addTearDown(() {
@@ -19,9 +19,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('SafeTorrent'), findsOneWidget);
-    expect(find.text('AlloCiné (Titre EN)'), findsOneWidget);
+    expect(find.text('Titres AlloCiné / Toutes langues'), findsOneWidget);
+    expect(find.text('Année'), findsOneWidget);
     expect(find.text('🇫🇷 Français'), findsOneWidget);
     expect(find.text('🇬🇧 English'), findsOneWidget);
     expect(find.text('🇪🇸 Español'), findsOneWidget);
+
+    // Multi-language selection works simultaneously (FR + EN active at the same time)
+    await tester.tap(find.text('🇬🇧 English'));
+    await tester.pumpAndSettle();
+    expect(find.text('🇫🇷 Français'), findsOneWidget);
+    expect(find.text('🇬🇧 English'), findsOneWidget);
   });
 }

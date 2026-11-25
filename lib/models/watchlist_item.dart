@@ -5,7 +5,7 @@ class WatchlistItem {
     required this.id,
     required this.titleFr,
     this.titleOriginal,
-    required this.language,
+    required this.languages,
     this.year,
     this.notes,
     this.found = false,
@@ -17,7 +17,7 @@ class WatchlistItem {
   final String id;
   final String titleFr;
   final String? titleOriginal;
-  final LanguageFilter language;
+  final List<LanguageFilter> languages;
   final int? year;
   final String? notes;
   final bool found;
@@ -34,7 +34,7 @@ class WatchlistItem {
       id: id,
       titleFr: titleFr,
       titleOriginal: titleOriginal,
-      language: language,
+      languages: languages,
       year: year,
       notes: notes,
       found: found ?? this.found,
@@ -48,7 +48,8 @@ class WatchlistItem {
         'id': id,
         'titleFr': titleFr,
         'titleOriginal': titleOriginal,
-        'language': language.code,
+        'languages': languages.map((e) => e.code).toList(),
+        'language': languages.isNotEmpty ? languages.first.code : 'fr',
         'year': year,
         'notes': notes,
         'found': found,
@@ -61,7 +62,10 @@ class WatchlistItem {
         id: json['id'] as String? ?? '',
         titleFr: json['titleFr'] as String? ?? '',
         titleOriginal: json['titleOriginal'] as String?,
-        language: LanguageFilter.fromCode(json['language'] as String?),
+        languages: LanguageFilter.fromJsonList(
+          json['languages'],
+          json['language'] as String?,
+        ),
         year: (json['year'] as num?)?.toInt(),
         notes: json['notes'] as String?,
         found: json['found'] as bool? ?? false,

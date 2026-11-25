@@ -96,11 +96,12 @@ class LocalStorageService {
   }
 
   Future<bool> addToWatchlist(WatchlistItem item) async {
-    final exists = watchlist.any(
-      (e) =>
-          e.titleFr.toLowerCase() == item.titleFr.toLowerCase() &&
-          e.language == item.language,
-    );
+    final newLangKey = (item.languages.map((l) => l.code).toList()..sort()).join(',');
+    final exists = watchlist.any((e) {
+      final existingKey = (e.languages.map((l) => l.code).toList()..sort()).join(',');
+      return e.titleFr.toLowerCase() == item.titleFr.toLowerCase() &&
+          existingKey == newLangKey;
+    });
     if (exists) return false;
     watchlist.insert(0, item);
     await _save();

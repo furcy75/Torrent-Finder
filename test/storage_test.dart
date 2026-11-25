@@ -7,25 +7,27 @@ import 'package:safetorrent/models/watchlist_item.dart';
 import 'package:safetorrent/services/local_storage.dart';
 
 void main() {
-  test('LocalStorage persists opt-in history and watchlist on disk', () async {
+  test('LocalStorage persists multi-language history and watchlist on disk', () async {
     final tmpDir = await Directory.systemTemp.createTemp('safetorrent_test_');
     addTearDown(() => tmpDir.delete(recursive: true));
 
     final storage = LocalStorageService(overrideDirectory: tmpDir);
     await storage.load();
 
-    // History enabled by default
+    // History enabled by default (multi-language + year)
     await storage.addHistory(
       HistoryItem(
         id: 'h1',
         query: 'Les Évadés',
         originalTitle: 'The Shawshank Redemption',
-        language: LanguageFilter.fr,
+        year: 1994,
+        languages: const [LanguageFilter.fr, LanguageFilter.en],
         resultCount: 4,
         createdAt: DateTime.now().toUtc(),
       ),
     );
     expect(storage.history.length, equals(1));
+    expect(storage.history.first.languages, equals([LanguageFilter.fr, LanguageFilter.en]));
 
     // Disable history -> new searches are NOT saved
     await storage.updateSettings(storage.settings.copyWith(saveHistory: false));
@@ -33,7 +35,7 @@ void main() {
       HistoryItem(
         id: 'h2',
         query: 'Secret Movie',
-        language: LanguageFilter.en,
+        languages: const [LanguageFilter.en],
         resultCount: 0,
         createdAt: DateTime.now().toUtc(),
       ),
@@ -45,7 +47,8 @@ void main() {
       WatchlistItem(
         id: 'w1',
         titleFr: 'Film Introuvable',
-        language: LanguageFilter.fr,
+        year: 2026,
+        languages: const [LanguageFilter.fr, LanguageFilter.es],
         createdAt: DateTime.now().toUtc(),
       ),
     );
@@ -53,7 +56,7 @@ void main() {
       WatchlistItem(
         id: 'w2',
         titleFr: 'film introuvable',
-        language: LanguageFilter.fr,
+        languages: const [LanguageFilter.es, LanguageFilter.fr],
         createdAt: DateTime.now().toUtc(),
       ),
     );
@@ -64,7 +67,8 @@ void main() {
     await reloaded.load();
     expect(reloaded.settings.saveHistory, isFalse);
     expect(reloaded.history.length, equals(1));
+    expect(reloaded.history.first.year, equals(1994));
     expect(reloaded.watchlist.length, equals(1));
-    expect(reloaded.watchlist.first.titleFr, equals('Film Introuvable'));
+    expect(reloaded.watchlist.first.languages.length, equals(2));
   });
 }

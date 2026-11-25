@@ -19,10 +19,12 @@ class SearchSummary {
 }
 
 /// Parallel on-device torrent search aggregator (pure HTTP JSON/XML — zero ads, zero JS).
+/// Supports multi-language selection (`FR` + `EN` + `ES`), multiple localized titles,
+/// optional release year filtering, and NFO metadata references.
 class IndexersService {
   static const Duration _timeout = Duration(seconds: 12);
   static const Map<String, String> _headers = {
-    'User-Agent': 'SafeTorrent/1.0 (Standalone)',
+    'User-Agent': 'SafeTorrent/1.1 (Standalone)',
   };
 
   static const List<String> _publicTrackers = [
@@ -42,38 +44,46 @@ class IndexersService {
 
   Future<SearchSummary> search({
     required String query,
-    String? originalTitle,
-    required LanguageFilter language,
+    List<String> extraTitles = const [],
+    required Set<LanguageFilter> languages,
     int? year,
     bool includeAllLanguages = false,
     required AppSettings settings,
   }) async {
-    final queries = <String>[query.trim()];
-    if (originalTitle != null &&
-        originalTitle.trim().isNotEmpty &&
-        originalTitle.trim().toLowerCase() != query.trim().toLowerCase()) {
-      queries.add(originalTitle.trim());
+    final seenQ = <String>{};
+    final queries = <String>[];
+    for (final raw in [query, ...extraTitles]) {
+      final clean = raw.trim();
+      if (clean.isNotEmpty && seenQ.add(clean.toLowerCase())) {
+        queries.add(clean);
+      }
     }
+
+    final effectiveLangs = includeAllLanguages || languages.isEmpty
+        ? const {LanguageFilter.all}
+        : languages;
 
     final tasks = <Future<(String, List<TorrentResult>, String?)>>[];
     final queriedNames = <String>[];
 
     if (settings.enableYts) {
       queriedNames.add('YTS');
-      tasks.add(_safeRun('YTS', () => _searchYts(queries, language, year)));
+      tasks.add(_safeRun('YTS', () => _searchYts(queries, effectiveLangs, year)));
     }
     if (settings.enableApibay) {
       queriedNames.add('APIBay');
-      tasks.add(_safeRun('APIBay', () => _searchApibay(queries, language, year)));
+      tasks.add(_safeRun('APIBay', () => _searchApibay(queries, effectiveLangs, year)));
     }
     if (settings.enableArchiveOrg) {
       queriedNames.add('Internet Archive');
-      tasks.add(_safeRun('Internet Archive', () => _searchArchiveOrg(queries, language, year)));
+      tasks.add(
+        _safeRun('Internet Archive', () => _searchArchiveOrg(queries, effectiveLangs, year)),
+      );
     }
     for (final tz in settings.torznabIndexers.where((c) => c.enabled)) {
       final label = 'Torznab: ${tz.name}';
       queriedNames.add(label);
-      tasks.add(_safeRun(label, () => _searchTorznab(tz, queries, language, year)));
+      tasks.add(_safeRun(label, () => _searchTorznab(tz, queries, effectiveLangs, year)));
     }
 
     final batches = await Future.wait(tasks);
@@ -92,15 +102,20 @@ class IndexersService {
           deduped[key] = item;
         } else if ((item.torrentUrl != null && existing.torrentUrl == null) ||
             item.seeders > existing.seeders) {
-          deduped[key] = item.torrentUrl == null && existing.torrentUrl != null
-              ? item.copyWith(torrentUrl: existing.torrentUrl)
-              : item;
+          deduped[key] = item.copyWith(
+            torrentUrl: item.torrentUrl ?? existing.torrentUrl,
+            nfoText: item.nfoText ?? existing.nfoText,
+            sourceId: item.sourceId ?? existing.sourceId,
+          );
         }
       }
     }
 
     var results = deduped.values.toList();
-    if (!includeAllLanguages && language != LanguageFilter.all) {
+    final filterAll = includeAllLanguages ||
+        effectiveLangs.contains(LanguageFilter.all) ||
+        effectiveLangs.length >= LanguageFilter.selectableFlags.length;
+    if (!filterAll) {
       final matched = results.where((r) => r.languageMatch).toList();
       if (matched.isNotEmpty) {
         results = matched;
@@ -135,11 +150,11 @@ class IndexersService {
   }
 
   // -------------------------------------------------------------------
-  // 1. YTS JSON API (Direct `.torrent` URLs)
+  // 1. YTS JSON API (Direct `.torrent` URLs + technical NFO metadata)
   // -------------------------------------------------------------------
   Future<List<TorrentResult>> _searchYts(
     List<String> queries,
-    LanguageFilter language,
+    Set<LanguageFilter> languages,
     int? year,
   ) async {
     const mirrors = [
@@ -149,7 +164,7 @@ class IndexersService {
     final out = <TorrentResult>[];
     final seen = <String>{};
 
-    for (final q in queries.take(2)) {
+    for (final q in queries.take(3)) {
       Map<String, dynamic>? payload;
       for (final mirror in mirrors) {
         try {
@@ -177,6 +192,7 @@ class IndexersService {
       for (final movie in movies) {
         final movieYear = (movie['year'] as num?)?.toInt();
         if (year != null && movieYear != null && (movieYear - year).abs() > 1) continue;
+        final movieId = movie['id']?.toString();
         final movieTitle = (movie['title_long'] ?? movie['title'] ?? q).toString();
         final mLang = (movie['language'] ?? 'en').toString().toLowerCase();
         final defaultLang = mLang.length >= 2 ? mLang.substring(0, 2).toUpperCase() : 'EN';
@@ -187,14 +203,32 @@ class IndexersService {
 
           final qStr = (t['quality'] ?? '').toString();
           final typeStr = (t['type'] ?? '').toString();
-          final fullTitle = '$movieTitle [$qStr $typeStr]'.trim();
-          final (quality, tags) =
-              ReleaseParser.parseQuality(fullTitle, explicitQuality: '$qStr $typeStr');
+          final vCodec = (t['video_codec'] ?? '').toString();
+          final bitDepth = (t['bit_depth'] ?? '').toString();
+          final audioCh = (t['audio_channels'] ?? '').toString();
+
+          final fullTitle =
+              '$movieTitle [$qStr $typeStr${vCodec.isNotEmpty ? ' $vCodec' : ''}]'.trim();
+          final (quality, tags) = ReleaseParser.parseQuality(
+            fullTitle,
+            explicitQuality: '$qStr $typeStr',
+          );
           final sizeBytes = (t['size_bytes'] as num?)?.toInt() ?? 0;
           final seeders = (t['seeds'] as num?)?.toInt() ?? 0;
           final leechers = (t['peers'] as num?)?.toInt() ?? 0;
           final langs = ReleaseParser.detectLanguages(fullTitle, defaultLang: defaultLang);
           final (preStatus, preWarn) = ReleaseParser.preScanTitle(fullTitle, sizeBytes, seeders);
+
+          final nfoLines = <String>[
+            'Release     : $fullTitle',
+            'Qualité     : $qStr ($typeStr)',
+            if (vCodec.isNotEmpty)
+              'Vidéo       : $vCodec${bitDepth.isNotEmpty ? ' ($bitDepth-bit)' : ''}',
+            if (audioCh.isNotEmpty) 'Audio       : $audioCh canaux ($defaultLang)',
+            'Taille      : ${t['size'] ?? ReleaseParser.formatSize(sizeBytes)}',
+            'Date upload : ${t['date_uploaded'] ?? '—'}',
+            'Info-Hash   : $hash',
+          ];
 
           out.add(
             TorrentResult(
@@ -207,8 +241,10 @@ class IndexersService {
               seeders: seeders,
               leechers: leechers,
               detectedLanguages: langs,
-              languageMatch: ReleaseParser.matchesLanguage(langs, language),
+              languageMatch: ReleaseParser.matchesAnyLanguage(langs, languages),
               indexer: 'YTS',
+              sourceId: movieId,
+              nfoText: nfoLines.join('\n'),
               infoHash: hash,
               torrentUrl: t['url']?.toString(),
               magnetUrl: buildMagnet(hash, fullTitle),
@@ -224,18 +260,18 @@ class IndexersService {
   }
 
   // -------------------------------------------------------------------
-  // 2. APIBay Pure JSON API (FR / EN / ES Movies)
+  // 2. APIBay Pure JSON API (FR / EN / ES Movies + real NFO via t.php)
   // -------------------------------------------------------------------
   Future<List<TorrentResult>> _searchApibay(
     List<String> queries,
-    LanguageFilter language,
+    Set<LanguageFilter> languages,
     int? year,
   ) async {
-    final terms = _expandApibayQueries(queries, language, year);
+    final terms = _expandApibayQueries(queries, languages, year);
     final out = <TorrentResult>[];
     final seen = <String>{};
 
-    for (final term in terms.take(3)) {
+    for (final term in terms.take(5)) {
       try {
         final uri = Uri.https('apibay.org', '/q.php', {'q': term, 'cat': '200'});
         final resp = await http.get(uri, headers: _headers).timeout(_timeout);
@@ -266,8 +302,9 @@ class IndexersService {
               seeders: seeders,
               leechers: leechers,
               detectedLanguages: langs,
-              languageMatch: ReleaseParser.matchesLanguage(langs, language),
+              languageMatch: ReleaseParser.matchesAnyLanguage(langs, languages),
               indexer: 'APIBay',
+              sourceId: item['id']?.toString(),
               infoHash: hash,
               torrentUrl: null,
               magnetUrl: buildMagnet(hash, name),
@@ -285,7 +322,7 @@ class IndexersService {
 
   List<String> _expandApibayQueries(
     List<String> queries,
-    LanguageFilter language,
+    Set<LanguageFilter> languages,
     int? year,
   ) {
     if (queries.isEmpty) return [];
@@ -294,17 +331,21 @@ class IndexersService {
     final suffix = year != null ? ' $year' : '';
     final raw = <String>[];
 
-    if (language == LanguageFilter.fr) {
+    final wantAll = languages.contains(LanguageFilter.all);
+    if (wantAll || languages.contains(LanguageFilter.fr)) {
       raw.add('$primary FRENCH');
       if (alt != null) raw.add('$alt FRENCH');
-      raw.add('$primary$suffix');
-    } else if (language == LanguageFilter.es) {
+    }
+    if (wantAll || languages.contains(LanguageFilter.es)) {
       raw.add('$primary SPANISH');
       if (alt != null) raw.add('$alt CASTELLANO');
-      raw.add('$primary$suffix');
-    } else {
+    }
+    if (wantAll || languages.contains(LanguageFilter.en)) {
       raw.add('${alt ?? primary}$suffix');
-      if (alt != null) raw.add(primary);
+    }
+    raw.add('$primary$suffix');
+    for (final q in queries.skip(1)) {
+      raw.add('$q$suffix');
     }
 
     final seen = <String>{};
@@ -312,11 +353,11 @@ class IndexersService {
   }
 
   // -------------------------------------------------------------------
-  // 3. Internet Archive (Public Domain / Classic Films — Direct `.torrent`)
+  // 3. Internet Archive (Public Domain / Classic Films + .nfo support)
   // -------------------------------------------------------------------
   Future<List<TorrentResult>> _searchArchiveOrg(
     List<String> queries,
-    LanguageFilter language,
+    Set<LanguageFilter> languages,
     int? year,
   ) async {
     if (queries.isEmpty) return [];
@@ -380,8 +421,9 @@ class IndexersService {
           seeders: seeds,
           leechers: 0,
           detectedLanguages: langs,
-          languageMatch: ReleaseParser.matchesLanguage(langs, language),
+          languageMatch: ReleaseParser.matchesAnyLanguage(langs, languages),
           indexer: 'Internet Archive',
+          sourceId: id,
           torrentUrl: 'https://archive.org/download/$id/${id}_archive.torrent',
           preScanStatus: preStatus,
           preScanWarnings: preWarn,
@@ -398,13 +440,13 @@ class IndexersService {
   Future<List<TorrentResult>> _searchTorznab(
     TorznabConfig config,
     List<String> queries,
-    LanguageFilter language,
+    Set<LanguageFilter> languages,
     int? year,
   ) async {
     final out = <TorrentResult>[];
     final seen = <String>{};
 
-    for (final q in queries.take(2)) {
+    for (final q in queries.take(3)) {
       final base = Uri.tryParse(config.baseUrl);
       if (base == null) continue;
       final uri = base.replace(queryParameters: {
@@ -425,6 +467,7 @@ class IndexersService {
         final title = item.getElement('title')?.innerText.trim() ?? '';
         if (title.isEmpty) continue;
 
+        final description = item.getElement('description')?.innerText.trim();
         final link = item.getElement('link')?.innerText.trim();
         final enc = item.getElement('enclosure');
         final rawLink = (link != null && link.isNotEmpty) ? link : enc?.getAttribute('url');
@@ -473,8 +516,9 @@ class IndexersService {
             seeders: seeders,
             leechers: leechers,
             detectedLanguages: langs,
-            languageMatch: ReleaseParser.matchesLanguage(langs, language),
+            languageMatch: ReleaseParser.matchesAnyLanguage(langs, languages),
             indexer: 'Torznab: ${config.name}',
+            nfoText: (description != null && description.isNotEmpty) ? description : null,
             infoHash: infoHash,
             torrentUrl: torrentUrl,
             magnetUrl: magnet,

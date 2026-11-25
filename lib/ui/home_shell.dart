@@ -11,14 +11,14 @@ class PendingSearchRequest {
     required this.query,
     this.originalTitle,
     this.year,
-    required this.language,
+    required this.languages,
     this.watchlistId,
   });
 
   final String query;
   final String? originalTitle;
   final int? year;
-  final LanguageFilter language;
+  final List<LanguageFilter> languages;
   final String? watchlistId;
 }
 

@@ -4,10 +4,11 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:http/http.dart' as http;
 import 'package:safetorrent/models/movie_suggestion.dart';
 
-/// Resolves a French movie title to its original / English title directly on-device:
-/// 1. AlloCiné (primary, pure raw HTTP HTML/JSON-LD — zero WebView, zero JS)
-/// 2. Wikidata API FR→EN (zero-API-key fallback)
-/// 3. IMDb Suggestion JSON API (fallback)
+/// Multilingual movie title resolver (AlloCiné + Wikidata FR/EN/ES + IMDb).
+///
+/// Supports searching by movie title + optional release year, and returns
+/// localized titles across French (FR), English (EN), Spanish (ES), and Original (VO)
+/// using pure raw HTTP requests (zero WebView, zero JavaScript).
 class AllocineService {
   static const String _allocineBase = 'https://www.allocine.fr';
   static const Duration _timeout = Duration(seconds: 10);
@@ -25,21 +26,86 @@ class AllocineService {
     return m != null ? int.tryParse(m.group(1)!) : null;
   }
 
-  Future<List<MovieSuggestion>> resolveMovieTitles(String query, {int limit = 5}) async {
+  /// Resolve movie titles across languages from AlloCiné + Wikidata (FR/EN/ES) + IMDb.
+  Future<List<MovieSuggestion>> resolveMovieTitles(
+    String query, {
+    int? year,
+    int limit = 6,
+  }) async {
     final clean = query.trim();
     if (clean.isEmpty) return [];
 
-    final allocineHits = await _searchAllocine(clean, limit: limit);
-    if (allocineHits.isNotEmpty) return allocineHits;
+    // Query AlloCiné and Wikidata (FR/EN/ES) concurrently to maximize multilingual coverage
+    final results = await Future.wait([
+      _searchAllocine(clean, year: year, limit: limit),
+      _searchWikidataMultilingual(clean, year: year, limit: limit),
+    ]);
 
-    final wikiHits = await _searchWikidata(clean, limit: limit);
-    if (wikiHits.isNotEmpty) return wikiHits;
+    final allocineHits = results[0];
+    final wikiHits = results[1];
 
-    return _searchImdb(clean, limit: limit);
+    // Enrich AlloCiné results with FR / EN / ES labels found via Wikidata when matching
+    final merged = <MovieSuggestion>[];
+    final usedWikiIndices = <int>{};
+
+    for (final a in allocineHits) {
+      MovieSuggestion enriched = a;
+      for (var i = 0; i < wikiHits.length; i++) {
+        final w = wikiHits[i];
+        final titleMatches = w.titleFr.toLowerCase() == a.titleFr.toLowerCase() ||
+            (w.titleEn != null && w.titleEn!.toLowerCase() == a.titleOriginal.toLowerCase()) ||
+            w.titleOriginal.toLowerCase() == a.titleOriginal.toLowerCase();
+        final yearMatches = a.year == null || w.year == null || (a.year! - w.year!).abs() <= 1;
+        if (titleMatches && yearMatches) {
+          usedWikiIndices.add(i);
+          enriched = enriched.copyWith(
+            titleEn: enriched.titleEn ?? w.titleEn,
+            titleEs: enriched.titleEs ?? w.titleEs,
+            year: enriched.year ?? w.year,
+            source: 'AlloCiné + Wikidata',
+          );
+          break;
+        }
+      }
+      merged.add(enriched);
+    }
+
+    // Add remaining distinct Wikidata multilingual hits
+    for (var i = 0; i < wikiHits.length; i++) {
+      if (usedWikiIndices.contains(i)) continue;
+      final w = wikiHits[i];
+      final dup = merged.any(
+        (m) =>
+            m.titleFr.toLowerCase() == w.titleFr.toLowerCase() &&
+            (m.year == null || w.year == null || m.year == w.year),
+      );
+      if (!dup) merged.add(w);
+    }
+
+    if (merged.isEmpty) {
+      merged.addAll(await _searchImdb(clean, year: year, limit: limit));
+    }
+
+    // Prioritize exact year match if user specified a year
+    if (year != null) {
+      merged.sort((a, b) {
+        final aDist = a.year != null ? (a.year! - year).abs() : 99;
+        final bDist = b.year != null ? (b.year! - year).abs() : 99;
+        return aDist.compareTo(bDist);
+      });
+    }
+
+    return merged.take(limit).toList();
   }
 
-  Future<List<MovieSuggestion>> _searchAllocine(String query, {int limit = 5}) async {
-    final uri = Uri.parse('$_allocineBase/rechercher/movie/?q=${Uri.encodeQueryComponent(query)}');
+  Future<List<MovieSuggestion>> _searchAllocine(
+    String query, {
+    int? year,
+    int limit = 5,
+  }) async {
+    final searchTerm = year != null ? '$query $year' : query;
+    final uri =
+        Uri.parse('$_allocineBase/rechercher/movie/?q=${Uri.encodeQueryComponent(searchTerm)}');
     final client = http.Client();
     try {
       final resp = await client.get(uri, headers: _allocineHeaders).timeout(_timeout);
@@ -56,7 +122,7 @@ class AllocineService {
         final href = titleEl.attributes['href'] ?? '';
         final movieUrl = href.startsWith('/') ? '$_allocineBase$href' : href;
 
-        var year = _extractYear(card.text);
+        var parsedYear = _extractYear(card.text);
 
         final imgEl = card.querySelector('img.thumbnail-img');
         var posterUrl = imgEl?.attributes['data-src'] ?? imgEl?.attributes['src'];
@@ -74,11 +140,10 @@ class AllocineService {
           }
         }
 
-        // Fetch top 2 movie detail pages to extract "Titre original" reliably
-        if (originalTitle == null && movieUrl.isNotEmpty && results.length < 2) {
+        if (originalTitle == null && movieUrl.isNotEmpty && results.length < 3) {
           final detail = await _fetchAllocineDetail(client, movieUrl);
           originalTitle ??= detail.$1;
-          year ??= detail.$2;
+          parsedYear ??= detail.$2;
           posterUrl ??= detail.$3;
         }
 
@@ -86,7 +151,8 @@ class AllocineService {
           MovieSuggestion(
             titleFr: titleFr,
             titleOriginal: originalTitle ?? titleFr,
-            year: year,
+            titleEn: originalTitle,
+            year: parsedYear,
             posterUrl: posterUrl,
             source: 'AlloCiné',
             sourceUrl: movieUrl.isNotEmpty ? movieUrl : null,
@@ -145,7 +211,7 @@ class AllocineService {
             }
           }
         } catch (_) {
-          // ignore malformed JSON-LD block
+          // ignore
         }
       }
       return (orig, year, poster);
@@ -154,77 +220,121 @@ class AllocineService {
     }
   }
 
-  Future<List<MovieSuggestion>> _searchWikidata(String query, {int limit = 5}) async {
-    const headers = {'User-Agent': 'SafeTorrent/1.0 (Standalone)'};
-    final searchUri = Uri.https('www.wikidata.org', '/w/api.php', {
-      'action': 'wbsearchentities',
-      'search': query,
-      'language': 'fr',
-      'uselang': 'fr',
-      'type': 'item',
-      'limit': '${limit + 3}',
-      'format': 'json',
-    });
+  /// Searches Wikidata in French, English, and Spanish simultaneously to retrieve
+  /// the movie's localized title in FR, EN, ES, and original language (P1476).
+  Future<List<MovieSuggestion>> _searchWikidataMultilingual(
+    String query, {
+    int? year,
+    int limit = 6,
+  }) async {
+    const headers = {'User-Agent': 'SafeTorrent/1.1 (Standalone)'};
+    final searchLanguages = ['fr', 'en', 'es'];
+    final candidateIds = <String>[];
+    final seenIds = <String>{};
 
     try {
-      final resp = await http.get(searchUri, headers: headers).timeout(_timeout);
-      if (resp.statusCode != 200) return [];
-      final decoded = jsonDecode(resp.body) as Map<String, dynamic>;
-      final items = (decoded['search'] as List? ?? []).whereType<Map<String, dynamic>>();
+      final searchResponses = await Future.wait(
+        searchLanguages.map((lang) {
+          final uri = Uri.https('www.wikidata.org', '/w/api.php', {
+            'action': 'wbsearchentities',
+            'search': query,
+            'language': lang,
+            'uselang': 'fr',
+            'type': 'item',
+            'limit': '6',
+            'format': 'json',
+          });
+          return http.get(uri, headers: headers).timeout(_timeout).catchError(
+                (_) => http.Response('', 500),
+              );
+        }),
+      );
 
-      final ids = <String>[];
-      for (final item in items) {
-        final desc = (item['description'] as String? ?? '').toLowerCase();
-        if (desc.contains('film') ||
-            desc.contains('movie') ||
-            desc.contains('cinéma') ||
-            desc.contains('animation') ||
-            desc.contains('long métrage')) {
+      for (final resp in searchResponses) {
+        if (resp.statusCode != 200) continue;
+        final decoded = jsonDecode(resp.body) as Map<String, dynamic>;
+        final items = (decoded['search'] as List? ?? []).whereType<Map<String, dynamic>>();
+        for (final item in items) {
+          final desc = (item['description'] as String? ?? '').toLowerCase();
+          final isMovie = desc.contains('film') ||
+              desc.contains('movie') ||
+              desc.contains('cinéma') ||
+              desc.contains('animation') ||
+              desc.contains('documentaire') ||
+              desc.contains('película') ||
+              desc.contains('long métrage');
           final id = item['id'] as String?;
-          if (id != null) ids.add(id);
+          if (isMovie && id != null && seenIds.add(id)) {
+            candidateIds.add(id);
+          }
+          if (candidateIds.length >= limit + 4) break;
         }
-        if (ids.length >= limit) break;
       }
-      if (ids.isEmpty) return [];
+
+      if (candidateIds.isEmpty) return [];
 
       final entUri = Uri.https('www.wikidata.org', '/w/api.php', {
         'action': 'wbgetentities',
-        'ids': ids.join('|'),
+        'ids': candidateIds.take(10).join('|'),
         'props': 'labels|descriptions|claims',
-        'languages': 'fr|en',
+        'languages': 'fr|en|es',
         'format': 'json',
       });
       final entResp = await http.get(entUri, headers: headers).timeout(_timeout);
       if (entResp.statusCode != 200) return [];
+
       final entities =
           (jsonDecode(entResp.body) as Map<String, dynamic>)['entities'] as Map<String, dynamic>? ??
               {};
 
       final suggestions = <MovieSuggestion>[];
-      for (final qid in ids) {
+      for (final qid in candidateIds.take(10)) {
         final ent = entities[qid] as Map<String, dynamic>? ?? {};
         final labels = ent['labels'] as Map<String, dynamic>? ?? {};
         final descs = ent['descriptions'] as Map<String, dynamic>? ?? {};
-        final titleFr = (labels['fr'] as Map?)?['value'] as String? ?? query;
-        final titleEn = (labels['en'] as Map?)?['value'] as String? ?? titleFr;
+        final claims = ent['claims'] as Map<String, dynamic>? ?? {};
 
-        int? year;
-        final p577 = (ent['claims'] as Map?)?['P577'] as List?;
+        final titleFr = (labels['fr'] as Map?)?['value'] as String?;
+        final titleEn = (labels['en'] as Map?)?['value'] as String?;
+        final titleEs = (labels['es'] as Map?)?['value'] as String?;
+
+        // Official original title property P1476 if available
+        String? titleOrig;
+        final p1476 = claims['P1476'] as List?;
+        if (p1476 != null && p1476.isNotEmpty) {
+          titleOrig = ((p1476.first as Map?)?['mainsnak'] as Map?)?['datavalue']?['value']?['text']
+              ?.toString();
+        }
+
+        // Release year property P577
+        int? parsedYear;
+        final p577 = claims['P577'] as List?;
         if (p577 != null && p577.isNotEmpty) {
           final tVal =
               ((p577.first as Map?)?['mainsnak'] as Map?)?['datavalue']?['value']?['time'];
-          year = _extractYear(tVal?.toString());
+          parsedYear = _extractYear(tVal?.toString());
         }
-        year ??= _extractYear((descs['fr'] as Map?)?['value'] as String?);
+        parsedYear ??= _extractYear((descs['fr'] as Map?)?['value'] as String?);
+        parsedYear ??= _extractYear((descs['en'] as Map?)?['value'] as String?);
+
+        if (year != null && parsedYear != null && (parsedYear - year).abs() > 2) {
+          continue;
+        }
+
+        final primaryFr = titleFr ?? titleEn ?? titleEs ?? titleOrig ?? query;
+        final primaryOrig = titleOrig ?? titleEn ?? primaryFr;
 
         suggestions.add(
           MovieSuggestion(
-            titleFr: titleFr,
-            titleOriginal: titleEn,
-            year: year,
-            source: 'Wikidata (FR→EN)',
+            titleFr: primaryFr,
+            titleEn: titleEn,
+            titleEs: titleEs,
+            titleOriginal: primaryOrig,
+            year: parsedYear,
+            source: 'Wikidata (FR/EN/ES)',
             sourceUrl: 'https://www.wikidata.org/wiki/$qid',
-            synopsis: (descs['fr'] as Map?)?['value'] as String?,
+            synopsis: (descs['fr'] as Map?)?['value'] as String? ??
+                (descs['en'] as Map?)?['value'] as String?,
           ),
         );
       }
@@ -234,7 +344,11 @@ class AllocineService {
     }
   }
 
-  Future<List<MovieSuggestion>> _searchImdb(String query, {int limit = 5}) async {
+  Future<List<MovieSuggestion>> _searchImdb(
+    String query, {
+    int? year,
+    int limit = 5,
+  }) async {
     final cleaned = query.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     final prefix = cleaned.isNotEmpty ? cleaned[0] : 'a';
     final uri = Uri.parse(
@@ -242,7 +356,7 @@ class AllocineService {
     );
     try {
       final resp =
-          await http.get(uri, headers: {'User-Agent': 'SafeTorrent/1.0'}).timeout(_timeout);
+          await http.get(uri, headers: {'User-Agent': 'SafeTorrent/1.1'}).timeout(_timeout);
       if (resp.statusCode != 200) return [];
       final list = (jsonDecode(resp.body) as Map<String, dynamic>)['d'] as List? ?? [];
       final out = <MovieSuggestion>[];
@@ -251,12 +365,15 @@ class AllocineService {
         if (!id.startsWith('tt')) continue;
         final title = raw['l']?.toString().trim() ?? '';
         if (title.isEmpty) continue;
+        final itemYear = raw['y'] is int ? raw['y'] as int : null;
+        if (year != null && itemYear != null && (itemYear - year).abs() > 2) continue;
         final img = raw['i'] as Map?;
         out.add(
           MovieSuggestion(
             titleFr: title,
+            titleEn: title,
             titleOriginal: title,
-            year: raw['y'] is int ? raw['y'] as int : null,
+            year: itemYear,
             posterUrl: img?['imageUrl'] as String?,
             source: 'IMDb',
             sourceUrl: 'https://www.imdb.com/title/$id/',

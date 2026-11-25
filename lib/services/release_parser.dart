@@ -145,6 +145,15 @@ class ReleaseParser {
     return false;
   }
 
+  static bool matchesAnyLanguage(List<String> detected, Set<LanguageFilter> requested) {
+    if (requested.isEmpty ||
+        requested.contains(LanguageFilter.all) ||
+        requested.length >= LanguageFilter.selectableFlags.length) {
+      return true;
+    }
+    return requested.any((lang) => matchesLanguage(detected, lang));
+  }
+
   static (SafetyStatus, List<String>) preScanTitle(
     String title,
     int sizeBytes,

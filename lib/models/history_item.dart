@@ -5,7 +5,8 @@ class HistoryItem {
     required this.id,
     required this.query,
     this.originalTitle,
-    required this.language,
+    this.year,
+    required this.languages,
     required this.resultCount,
     required this.createdAt,
   });
@@ -13,7 +14,8 @@ class HistoryItem {
   final String id;
   final String query;
   final String? originalTitle;
-  final LanguageFilter language;
+  final int? year;
+  final List<LanguageFilter> languages;
   final int resultCount;
   final DateTime createdAt;
 
@@ -21,7 +23,9 @@ class HistoryItem {
         'id': id,
         'query': query,
         'originalTitle': originalTitle,
-        'language': language.code,
+        'year': year,
+        'languages': languages.map((e) => e.code).toList(),
+        'language': languages.isNotEmpty ? languages.first.code : 'fr',
         'resultCount': resultCount,
         'createdAt': createdAt.toUtc().toIso8601String(),
       };
@@ -30,7 +34,11 @@ class HistoryItem {
         id: json['id'] as String? ?? '',
         query: json['query'] as String? ?? '',
         originalTitle: json['originalTitle'] as String?,
-        language: LanguageFilter.fromCode(json['language'] as String?),
+        year: (json['year'] as num?)?.toInt(),
+        languages: LanguageFilter.fromJsonList(
+          json['languages'],
+          json['language'] as String?,
+        ),
         resultCount: (json['resultCount'] as num?)?.toInt() ?? 0,
         createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now().toUtc(),
       );

@@ -13,21 +13,31 @@ void main() {
     expect(q2, equals('1080p WEB-DL'));
   });
 
-  test('Detects and matches FR, EN, ES, and MULTI flags', () {
+  test('Detects and matches single and multiple FR, EN, ES, MULTI flags', () {
     final fr = ReleaseParser.detectLanguages('Les.Evades.1994.TRUEFRENCH.1080p.BluRay');
     expect(fr, contains('FR'));
     expect(ReleaseParser.matchesLanguage(fr, LanguageFilter.fr), isTrue);
     expect(ReleaseParser.matchesLanguage(fr, LanguageFilter.es), isFalse);
+    expect(
+      ReleaseParser.matchesAnyLanguage(fr, {LanguageFilter.fr, LanguageFilter.es}),
+      isTrue,
+    );
 
     final es = ReleaseParser.detectLanguages('Origen.2010.Castellano.1080p');
     expect(es, contains('ES'));
-    expect(ReleaseParser.matchesLanguage(es, LanguageFilter.es), isTrue);
+    expect(
+      ReleaseParser.matchesAnyLanguage(es, {LanguageFilter.fr, LanguageFilter.es}),
+      isTrue,
+    );
+    expect(
+      ReleaseParser.matchesAnyLanguage(es, {LanguageFilter.fr, LanguageFilter.en}),
+      isFalse,
+    );
 
     final multi = ReleaseParser.detectLanguages('Inception.2010.MULTI.1080p.BluRay');
     expect(multi, contains('MULTI'));
-    expect(ReleaseParser.matchesLanguage(multi, LanguageFilter.fr), isTrue);
-    expect(ReleaseParser.matchesLanguage(multi, LanguageFilter.en), isTrue);
-    expect(ReleaseParser.matchesLanguage(multi, LanguageFilter.es), isTrue);
+    expect(ReleaseParser.matchesAnyLanguage(multi, {LanguageFilter.fr}), isTrue);
+    expect(ReleaseParser.matchesAnyLanguage(multi, {LanguageFilter.es}), isTrue);
   });
 
   test('Pre-scan blocks executable filenames and flags zero seeders', () {

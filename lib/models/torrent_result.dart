@@ -10,11 +10,37 @@ enum LanguageFilter {
   final String flag;
   final String label;
 
+  static const List<LanguageFilter> selectableFlags = [fr, en, es];
+
   static LanguageFilter fromCode(String? code) {
     return LanguageFilter.values.firstWhere(
       (e) => e.code == code,
       orElse: () => LanguageFilter.fr,
     );
+  }
+
+  static List<LanguageFilter> fromJsonList(dynamic rawList, String? legacyCode) {
+    if (rawList is List && rawList.isNotEmpty) {
+      final parsed = rawList
+          .map((e) => fromCode(e?.toString()))
+          .where((l) => l != LanguageFilter.all)
+          .toSet()
+          .toList();
+      if (parsed.isNotEmpty) return parsed;
+    }
+    if (legacyCode == 'all') return List<LanguageFilter>.from(selectableFlags);
+    if (legacyCode != null && legacyCode.isNotEmpty) {
+      return [fromCode(legacyCode)];
+    }
+    return [LanguageFilter.fr];
+  }
+
+  static String formatFlags(Iterable<LanguageFilter> langs) {
+    final set = langs.where((l) => l != LanguageFilter.all).toSet();
+    if (set.isEmpty || set.length == selectableFlags.length) {
+      return '🌍 Toutes (🇫🇷 🇬🇧 🇪🇸)';
+    }
+    return set.map((l) => '${l.flag} ${l.code.toUpperCase()}').join(' + ');
   }
 }
 
@@ -39,6 +65,8 @@ class TorrentResult {
     required this.detectedLanguages,
     required this.languageMatch,
     required this.indexer,
+    this.sourceId,
+    this.nfoText,
     this.infoHash,
     this.torrentUrl,
     this.magnetUrl,
@@ -58,6 +86,8 @@ class TorrentResult {
   final List<String> detectedLanguages;
   final bool languageMatch;
   final String indexer;
+  final String? sourceId;
+  final String? nfoText;
   final String? infoHash;
   final String? torrentUrl;
   final String? magnetUrl;
@@ -65,7 +95,11 @@ class TorrentResult {
   final List<String> preScanWarnings;
   final String? publishedAt;
 
-  TorrentResult copyWith({String? torrentUrl}) {
+  TorrentResult copyWith({
+    String? torrentUrl,
+    String? nfoText,
+    String? sourceId,
+  }) {
     return TorrentResult(
       id: id,
       title: title,
@@ -78,6 +112,8 @@ class TorrentResult {
       detectedLanguages: detectedLanguages,
       languageMatch: languageMatch,
       indexer: indexer,
+      sourceId: sourceId ?? this.sourceId,
+      nfoText: nfoText ?? this.nfoText,
       infoHash: infoHash,
       torrentUrl: torrentUrl ?? this.torrentUrl,
       magnetUrl: magnetUrl,
