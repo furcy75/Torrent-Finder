@@ -1,0 +1,29 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Generated platform runners (generated automatically by `flutter create` or CI)
+# Remove these lines if you commit customized platform folders locally.
+android/local.properties
+android/.gradle/
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/key.properties
+*.jks
+*.keystore
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
+macos/Flutter/ephemeral/
+ios/Flutter/ephemeral/
