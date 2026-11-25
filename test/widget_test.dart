@@ -39,7 +39,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Soutenir Torrent Seeder'), findsOneWidget);
     expect(find.text('Faire un don (GitHub Sponsors)'), findsOneWidget);
-    await tester.tap(find.text('Plus tard'));
+    await tester.tap(
+      find.descendant(of: find.byType(AlertDialog), matching: find.text('Plus tard')),
+    );
     await tester.pumpAndSettle();
 
     // Switch to Seedr tab and verify general account label + both auth flows
