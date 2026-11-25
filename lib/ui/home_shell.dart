@@ -4,7 +4,6 @@ import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/ui/search_screen.dart';
 import 'package:safetorrent/ui/seedr_screen.dart';
 import 'package:safetorrent/ui/settings_dialog.dart';
-import 'package:safetorrent/ui/torbox_screen.dart';
 import 'package:safetorrent/ui/watchlist_screen.dart';
 
 class PendingSearchRequest {
@@ -32,7 +31,6 @@ class _HomeShellState extends State<HomeShell> {
   PendingSearchRequest? _pendingSearch;
   int _searchTriggerId = 0;
   int _seedrRefreshSignal = 0;
-  int _torboxRefreshSignal = 0;
 
   @override
   void initState() {
@@ -65,28 +63,23 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
-  void _openTorboxTab({bool refresh = true}) {
-    setState(() {
-      if (refresh) _torboxRefreshSignal++;
-      _tabIndex = 3;
-    });
-  }
-
   Future<void> _openSettings() async {
     await showDialog<void>(
       context: context,
-      builder: (_) => SettingsDialog(storage: widget.storage),
+      builder: (_) => SettingsDialog(
+        storage: widget.storage,
+        onOpenSeedrTab: () => _openSeedrTab(refresh: true),
+      ),
     );
     if (mounted) {
-      setState(() => _torboxRefreshSignal++);
+      setState(() => _seedrRefreshSignal++);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final watchlistCount = widget.storage.watchlist.length;
-    final seedrConnected = widget.storage.seedrSession?.isValid == true;
-    final torboxConnected = widget.storage.torboxProfiles.isNotEmpty;
+    final seedrCount = widget.storage.seedrAccounts.length;
 
     return Scaffold(
       appBar: AppBar(
@@ -130,7 +123,7 @@ class _HomeShellState extends State<HomeShell> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Réglages sécurité, Cloud & sources',
+            tooltip: 'Réglages sécurité, Seedr & sources',
             icon: const Icon(Icons.settings_outlined),
             onPressed: _ready ? _openSettings : null,
           ),
@@ -148,7 +141,6 @@ class _HomeShellState extends State<HomeShell> {
                   triggerId: _searchTriggerId,
                   onDataChanged: () => setState(() {}),
                   onOpenSeedr: () => _openSeedrTab(refresh: true),
-                  onOpenTorbox: () => _openTorboxTab(refresh: true),
                 ),
                 WatchlistScreen(
                   storage: widget.storage,
@@ -160,11 +152,6 @@ class _HomeShellState extends State<HomeShell> {
                   refreshSignal: _seedrRefreshSignal,
                   onSessionChanged: () => setState(() {}),
                 ),
-                TorboxScreen(
-                  storage: widget.storage,
-                  refreshSignal: _torboxRefreshSignal,
-                  onProfilesChanged: () => setState(() {}),
-                ),
               ],
             ),
       bottomNavigationBar: NavigationBar(
@@ -174,7 +161,6 @@ class _HomeShellState extends State<HomeShell> {
           setState(() {
             _tabIndex = idx;
             if (idx == 2) _seedrRefreshSignal++;
-            if (idx == 3) _torboxRefreshSignal++;
           });
         },
         destinations: [
@@ -192,21 +178,13 @@ class _HomeShellState extends State<HomeShell> {
           ),
           NavigationDestination(
             icon: Badge(
-              isLabelVisible: seedrConnected,
+              isLabelVisible: seedrCount > 0,
               backgroundColor: const Color(0xFF22C55E),
+              label: seedrCount > 1 ? Text('$seedrCount') : null,
               smallSize: 8,
               child: const Icon(Icons.cloud_outlined),
             ),
             label: 'Seedr',
-          ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: torboxConnected,
-              backgroundColor: const Color(0xFF22C55E),
-              smallSize: 8,
-              child: const Icon(Icons.bolt_outlined),
-            ),
-            label: 'TorBox',
           ),
         ],
       ),

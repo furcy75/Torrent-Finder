@@ -7,7 +7,7 @@ import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/ui/widgets/country_flag.dart';
 
 void main() {
-  testWidgets('SafeTorrent launches with Films/Séries toggle, no history tab, and reset button',
+  testWidgets('SafeTorrent launches with Films/Séries toggle, Seedr multi-accounts, and no TorBox/history',
       (tester) async {
     final tmpDir = Directory.systemTemp.createTempSync('safetorrent_widget_');
     addTearDown(() {
@@ -27,22 +27,18 @@ void main() {
     expect(find.text('Rechercher'), findsOneWidget);
     expect(find.text('Plus tard'), findsOneWidget);
     expect(find.text('Seedr'), findsOneWidget);
-    expect(find.text('TorBox'), findsOneWidget);
 
-    // History and year field are removed
+    // History, year field, and TorBox are removed
     expect(find.text('Historique'), findsNothing);
     expect(find.text('Année'), findsNothing);
+    expect(find.text('TorBox'), findsNothing);
 
-    // Switch to Seedr tab and verify both auth flows exist
+    // Switch to Seedr tab and verify family profile label + both auth flows
     await tester.tap(find.text('Seedr'));
     await tester.pumpAndSettle();
+    expect(find.text('Nom du profil (ex : Moi, Sœur, Fille)'), findsOneWidget);
     expect(find.text('Code Appareil (Recommandé)'), findsOneWidget);
     expect(find.text('Email & Mot de passe'), findsOneWidget);
-
-    // Switch to TorBox tab and verify onboarding
-    await tester.tap(find.text('TorBox'));
-    await tester.pumpAndSettle();
-    expect(find.text('Ajouter un profil TorBox'), findsOneWidget);
 
     // Return to Search tab
     await tester.tap(find.text('Rechercher'));

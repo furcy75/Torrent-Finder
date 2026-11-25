@@ -4,13 +4,12 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:safetorrent/models/app_settings.dart';
 import 'package:safetorrent/models/seedr_models.dart';
-import 'package:safetorrent/models/torbox_models.dart';
 import 'package:safetorrent/models/watchlist_item.dart';
 
 /// 100% on-device local persistence (Android, Windows, Linux — zero server/cloud).
 ///
-/// Stores user settings, the "Plus tard" watchlist, optional Seedr OAuth tokens,
-/// and optional named TorBox profiles (API keys stored locally only).
+/// Stores user settings, the "Plus tard" watchlist, and optional named Seedr
+/// family accounts (OAuth tokens only — passwords are NEVER saved).
 class LocalStorageService {
   LocalStorageService({Directory? overrideDirectory})
       : _overrideDirectory = overrideDirectory;
@@ -19,19 +18,28 @@ class LocalStorageService {
 
   AppSettings settings = const AppSettings();
   List<WatchlistItem> watchlist = [];
-  SeedrSession? seedrSession;
-  List<TorboxProfile> torboxProfiles = [];
-  String? activeTorboxProfileId;
+  List<SeedrSession> seedrAccounts = [];
+  String? activeSeedrAccountId;
   bool isLoaded = false;
 
-  TorboxProfile? get activeTorboxProfile {
-    if (torboxProfiles.isEmpty) return null;
-    if (activeTorboxProfileId != null) {
-      for (final p in torboxProfiles) {
-        if (p.id == activeTorboxProfileId) return p;
+  SeedrSession? get activeSeedrAccount {
+    if (seedrAccounts.isEmpty) return null;
+    if (activeSeedrAccountId != null) {
+      for (final acc in seedrAccounts) {
+        if (acc.id == activeSeedrAccountId) return acc;
       }
     }
-    return torboxProfiles.first;
+    return seedrAccounts.first;
+  }
+
+  /// Legacy single-session getter mapped to [activeSeedrAccount].
+  SeedrSession? get seedrSession => activeSeedrAccount;
+
+  SeedrSession? seedrAccountById(String id) {
+    for (final acc in seedrAccounts) {
+      if (acc.id == id) return acc;
+    }
+    return null;
   }
 
   Future<File> _storageFile() async {
@@ -59,21 +67,25 @@ class LocalStorageService {
             .map(WatchlistItem.fromJson)
             .toList();
       }
-      if (decoded['seedrSession'] is Map<String, dynamic>) {
-        final s = SeedrSession.fromJson(decoded['seedrSession'] as Map<String, dynamic>);
-        seedrSession = s.isValid ? s : null;
-      }
-      if (decoded['torboxProfiles'] is List) {
-        torboxProfiles = (decoded['torboxProfiles'] as List)
+
+      if (decoded['seedrAccounts'] is List) {
+        seedrAccounts = (decoded['seedrAccounts'] as List)
             .whereType<Map<String, dynamic>>()
-            .map(TorboxProfile.fromJson)
-            .where((p) => p.apiKey.trim().isNotEmpty)
+            .map(SeedrSession.fromJson)
+            .where((a) => a.isValid)
             .toList();
       }
-      activeTorboxProfileId = decoded['activeTorboxProfileId'] as String?;
-      if (torboxProfiles.isNotEmpty &&
-          !torboxProfiles.any((p) => p.id == activeTorboxProfileId)) {
-        activeTorboxProfileId = torboxProfiles.first.id;
+      // Automatic migration from v1.5 single `seedrSession`
+      if (seedrAccounts.isEmpty && decoded['seedrSession'] is Map<String, dynamic>) {
+        final legacy = SeedrSession.fromJson(decoded['seedrSession'] as Map<String, dynamic>);
+        if (legacy.isValid) {
+          seedrAccounts = [legacy];
+        }
+      }
+      activeSeedrAccountId = decoded['activeSeedrAccountId'] as String?;
+      if (seedrAccounts.isNotEmpty &&
+          !seedrAccounts.any((a) => a.id == activeSeedrAccountId)) {
+        activeSeedrAccountId = seedrAccounts.first.id;
       }
     } catch (_) {
       // Fall back cleanly to defaults if file is empty or unreadable
@@ -87,9 +99,8 @@ class LocalStorageService {
     final payload = {
       'settings': settings.toJson(),
       'watchlist': watchlist.map((e) => e.toJson()).toList(),
-      'seedrSession': seedrSession?.toJson(),
-      'torboxProfiles': torboxProfiles.map((e) => e.toJson()).toList(),
-      'activeTorboxProfileId': activeTorboxProfileId,
+      'seedrAccounts': seedrAccounts.map((e) => e.toJson()).toList(),
+      'activeSeedrAccountId': activeSeedrAccountId,
     };
     final tmp = File('${file.path}.tmp');
     await tmp.writeAsString(jsonEncode(payload));
@@ -101,35 +112,44 @@ class LocalStorageService {
     await _save();
   }
 
-  Future<void> setSeedrSession(SeedrSession? session) async {
-    seedrSession = (session != null && session.isValid) ? session : null;
-    await _save();
-  }
-
-  Future<void> addOrUpdateTorboxProfile(TorboxProfile profile, {bool makeActive = true}) async {
-    final idx = torboxProfiles.indexWhere((p) => p.id == profile.id);
+  Future<void> addOrUpdateSeedrAccount(
+    SeedrSession account, {
+    bool makeActive = true,
+  }) async {
+    if (!account.isValid) return;
+    final idx = seedrAccounts.indexWhere((a) => a.id == account.id);
     if (idx == -1) {
-      torboxProfiles.add(profile);
+      seedrAccounts.add(account);
     } else {
-      torboxProfiles[idx] = profile;
+      seedrAccounts[idx] = account;
     }
-    if (makeActive || activeTorboxProfileId == null) {
-      activeTorboxProfileId = profile.id;
+    if (makeActive || activeSeedrAccountId == null) {
+      activeSeedrAccountId = account.id;
     }
     await _save();
   }
 
-  Future<void> setActiveTorboxProfile(String profileId) async {
-    if (torboxProfiles.any((p) => p.id == profileId)) {
-      activeTorboxProfileId = profileId;
+  Future<void> setActiveSeedrAccount(String accountId) async {
+    if (seedrAccounts.any((a) => a.id == accountId)) {
+      activeSeedrAccountId = accountId;
       await _save();
     }
   }
 
-  Future<void> deleteTorboxProfile(String profileId) async {
-    torboxProfiles.removeWhere((p) => p.id == profileId);
-    if (activeTorboxProfileId == profileId) {
-      activeTorboxProfileId = torboxProfiles.isNotEmpty ? torboxProfiles.first.id : null;
+  Future<void> renameSeedrAccount(String accountId, String newLabel) async {
+    final trimmed = newLabel.trim();
+    if (trimmed.isEmpty) return;
+    final idx = seedrAccounts.indexWhere((a) => a.id == accountId);
+    if (idx != -1) {
+      seedrAccounts[idx] = seedrAccounts[idx].copyWith(label: trimmed);
+      await _save();
+    }
+  }
+
+  Future<void> deleteSeedrAccount(String accountId) async {
+    seedrAccounts.removeWhere((a) => a.id == accountId);
+    if (activeSeedrAccountId == accountId) {
+      activeSeedrAccountId = seedrAccounts.isNotEmpty ? seedrAccounts.first.id : null;
     }
     await _save();
   }

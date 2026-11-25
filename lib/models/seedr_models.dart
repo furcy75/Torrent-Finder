@@ -1,58 +1,162 @@
-/// Local Seedr OAuth session (password is NEVER persisted on disk).
+/// Local Seedr OAuth account session (password is NEVER persisted on disk).
+/// Supports multiple named family accounts (e.g., "Moi", "Sœur", "Fille").
 class SeedrSession {
   const SeedrSession({
+    required this.id,
+    required this.label,
     required this.accessToken,
     this.refreshToken,
+    this.deviceCode,
     required this.authMode, // 'device' or 'password'
     this.username,
     this.email,
     this.packageName,
+    this.lastSpaceUsed,
+    this.lastSpaceMax,
   });
 
+  final String id;
+  final String label;
   final String accessToken;
   final String? refreshToken;
+  final String? deviceCode;
   final String authMode;
   final String? username;
   final String? email;
   final String? packageName;
+  final int? lastSpaceUsed;
+  final int? lastSpaceMax;
 
   bool get isValid => accessToken.trim().isNotEmpty;
 
+  String get displayName {
+    final trimmed = label.trim();
+    if (trimmed.isNotEmpty) return trimmed;
+    if (username != null && username!.trim().isNotEmpty) return username!.trim();
+    if (email != null && email!.trim().isNotEmpty) return email!.trim();
+    return 'Compte Seedr';
+  }
+
+  int? get lastSpaceFree {
+    if (lastSpaceMax == null || lastSpaceMax! <= 0 || lastSpaceUsed == null) {
+      return null;
+    }
+    return (lastSpaceMax! - lastSpaceUsed!).clamp(0, lastSpaceMax!);
+  }
+
+  double get usedRatio {
+    if (lastSpaceMax == null || lastSpaceMax! <= 0 || lastSpaceUsed == null) {
+      return 0.0;
+    }
+    return (lastSpaceUsed! / lastSpaceMax!).clamp(0.0, 1.0);
+  }
+
+  /// Returns whether cached free quota is known to be enough for [requiredBytes].
+  /// Returns `null` when quota or torrent size is unknown.
+  bool? fitsTorrentSize(int requiredBytes) {
+    final free = lastSpaceFree;
+    if (free == null || requiredBytes <= 0) return null;
+    return free >= requiredBytes;
+  }
+
   SeedrSession copyWith({
+    String? id,
+    String? label,
     String? accessToken,
     String? refreshToken,
+    String? deviceCode,
     String? authMode,
     String? username,
     String? email,
     String? packageName,
+    int? lastSpaceUsed,
+    int? lastSpaceMax,
   }) {
     return SeedrSession(
+      id: id ?? this.id,
+      label: label ?? this.label,
       accessToken: accessToken ?? this.accessToken,
       refreshToken: refreshToken ?? this.refreshToken,
+      deviceCode: deviceCode ?? this.deviceCode,
       authMode: authMode ?? this.authMode,
       username: username ?? this.username,
       email: email ?? this.email,
       packageName: packageName ?? this.packageName,
+      lastSpaceUsed: lastSpaceUsed ?? this.lastSpaceUsed,
+      lastSpaceMax: lastSpaceMax ?? this.lastSpaceMax,
     );
   }
 
   Map<String, dynamic> toJson() => {
+        'id': id,
+        'label': label,
         'accessToken': accessToken,
         'refreshToken': refreshToken,
+        'deviceCode': deviceCode,
         'authMode': authMode,
         'username': username,
         'email': email,
         'packageName': packageName,
+        'lastSpaceUsed': lastSpaceUsed,
+        'lastSpaceMax': lastSpaceMax,
       };
 
-  factory SeedrSession.fromJson(Map<String, dynamic> json) => SeedrSession(
-        accessToken: json['accessToken'] as String? ?? '',
-        refreshToken: json['refreshToken'] as String?,
-        authMode: json['authMode'] as String? ?? 'device',
-        username: json['username'] as String?,
-        email: json['email'] as String?,
-        packageName: json['packageName'] as String?,
-      );
+  factory SeedrSession.fromJson(Map<String, dynamic> json) {
+    final username = json['username'] as String?;
+    final email = json['email'] as String?;
+    final rawLabel = (json['label'] as String? ?? '').trim();
+    final fallbackLabel = rawLabel.isNotEmpty
+        ? rawLabel
+        : (username != null && username.trim().isNotEmpty
+            ? username.trim()
+            : (email != null && email.trim().isNotEmpty ? email.trim() : 'Compte principal'));
+    return SeedrSession(
+      id: (json['id'] as String? ?? 'seedr_default').trim(),
+      label: fallbackLabel,
+      accessToken: json['accessToken'] as String? ?? '',
+      refreshToken: json['refreshToken'] as String?,
+      deviceCode: json['deviceCode'] as String?,
+      authMode: json['authMode'] as String? ?? 'device',
+      username: username,
+      email: email,
+      packageName: json['packageName'] as String?,
+      lastSpaceUsed: (json['lastSpaceUsed'] as num?)?.toInt(),
+      lastSpaceMax: (json['lastSpaceMax'] as num?)?.toInt(),
+    );
+  }
+}
+
+/// Live quota snapshot for a single Seedr account, used in the manual account picker.
+class SeedrAccountQuota {
+  const SeedrAccountQuota({
+    required this.account,
+    this.spaceUsed,
+    this.spaceMax,
+    this.error,
+  });
+
+  final SeedrSession account;
+  final int? spaceUsed;
+  final int? spaceMax;
+  final String? error;
+
+  int? get spaceFree {
+    if (spaceMax == null || spaceMax! <= 0 || spaceUsed == null) return null;
+    return (spaceMax! - spaceUsed!).clamp(0, spaceMax!);
+  }
+
+  double get usedRatio {
+    if (spaceMax == null || spaceMax! <= 0 || spaceUsed == null) return 0.0;
+    return (spaceUsed! / spaceMax!).clamp(0.0, 1.0);
+  }
+
+  /// Whether this account has enough free quota for [requiredBytes].
+  /// Returns `null` when either quota or size is unknown.
+  bool? canFit(int requiredBytes) {
+    final free = spaceFree;
+    if (free == null || requiredBytes <= 0) return null;
+    return free >= requiredBytes;
+  }
 }
 
 class SeedrDeviceCode {
@@ -178,6 +282,8 @@ class SeedrFolderContents {
   final List<SeedrTorrentTransfer> torrents;
   final List<SeedrFolderEntry> folders;
   final List<SeedrFileEntry> files;
+
+  int get spaceFree => spaceMax > 0 ? (spaceMax - spaceUsed).clamp(0, spaceMax) : 0;
 
   double get usedRatio => spaceMax > 0 ? (spaceUsed / spaceMax).clamp(0.0, 1.0) : 0.0;
 

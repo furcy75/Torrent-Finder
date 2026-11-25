@@ -61,15 +61,10 @@ Récupérez directement la dernière version prête à l'emploi depuis [**GitHub
   - **Qualité** : `🚫 Sans CAM/TS` *(activé par défaut)*
 - **Visionneuse NFO / Détails sécurisée** : consulte le NFO/MediaInfo en texte brut monospace (APIBay `t.php`, fiche YTS, `.nfo` Internet Archive) sans jamais rendre de HTML ou JavaScript.
 
-### ☁️ Intégration Seedr.cc en direct (optionnelle)
-- **Deux modes de connexion** : **Code Appareil** (`seedr.cc/devices`, jeton longue durée sans mot de passe) ou **Email & Mot de passe** (seul le jeton OAuth est conservé localement, jamais votre mot de passe).
-- **Envoi en 1 clic** depuis les résultats de recherche ou depuis la modale **Bac à sable** (upload direct du fichier `.torrent` vérifié et assaini).
-- **Gestion en direct du compte** dans l'onglet **Seedr** : jauge de quota utilisé/libre, suivi auto-actualisé des transferts en cours, explorateur de dossiers/fichiers, téléchargement direct HTTPS, archive `.zip` de dossier, copie du lien direct (VLC) et suppression en un clic.
-
-### ⚡ Intégration TorBox en direct (optionnelle, multi-profils)
-- **Gestion de plusieurs profils familiaux** dans **⚙️ Réglages** ou l'onglet **TorBox** (chacun avec sa propre clé API officielle `torbox.app/settings` stockée localement).
-- **Statut officiel en direct** (`/v1/api/user/me`) : badge **⭐ Premium** (*Essential / Standard / Pro — sans limite*) ou **Gratuit** avec affichage du compte à rebours officiel si un compte gratuit est en cooldown.
-- **Envoi en 1 clic** (Magnet ou `.torrent` assaini par le bac à sable) + gestion en direct (`/torrents/mylist`, téléchargement HTTPS `/torrents/requestdl`, ZIP, pause/reprise et suppression).
+### ☁️ Intégration Seedr.cc en direct (optionnelle, multi-comptes famille)
+- **Plusieurs comptes familiaux** : connectez plusieurs comptes Seedr nommés (*Moi*, *Sœur*, *Fille*...) via **Code Appareil** (`seedr.cc/devices`, renouvellement auto sans mot de passe) ou **Email & Mot de passe** (seul le jeton OAuth est conservé localement, jamais votre mot de passe).
+- **Sélecteur de compte selon le quota disponible** : lors de l'envoi d'un lien Magnet ou d'un `.torrent` assaini par le bac à sable, SafeTorrent vérifie en direct l'espace libre de chaque compte et vous laisse **choisir manuellement** sur quel compte l'envoyer.
+- **Gestion en direct du compte** dans l'onglet **Seedr** : changement rapide entre comptes famille, jauge de quota utilisé/libre, suivi auto-actualisé des transferts en cours, explorateur de dossiers/fichiers, téléchargement direct HTTPS, archive `.zip` de dossier, copie du lien direct (VLC) et suppression en un clic.
 
 ### 📌 Liste « Plus tard » (sans historique superflu)
 - Aucun historique de navigation inutile n'est enregistré.

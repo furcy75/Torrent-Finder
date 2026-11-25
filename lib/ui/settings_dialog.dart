@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:safetorrent/models/app_settings.dart';
-import 'package:safetorrent/models/torbox_models.dart';
 import 'package:safetorrent/services/local_storage.dart';
-import 'package:safetorrent/services/torbox_service.dart';
+import 'package:safetorrent/services/release_parser.dart';
 
 class SettingsDialog extends StatefulWidget {
-  const SettingsDialog({super.key, required this.storage});
+  const SettingsDialog({
+    super.key,
+    required this.storage,
+    this.onOpenSeedrTab,
+  });
 
   final LocalStorageService storage;
+  final VoidCallback? onOpenSeedrTab;
 
   @override
   State<SettingsDialog> createState() => _SettingsDialogState();
@@ -15,16 +19,10 @@ class SettingsDialog extends StatefulWidget {
 
 class _SettingsDialogState extends State<SettingsDialog> {
   late AppSettings _draft;
-  late final TorboxService _torbox = TorboxService(storage: widget.storage);
 
   final _tzNameCtrl = TextEditingController();
   final _tzUrlCtrl = TextEditingController();
   final _tzKeyCtrl = TextEditingController();
-
-  final _tbLabelCtrl = TextEditingController();
-  final _tbKeyCtrl = TextEditingController();
-  bool _addingTorbox = false;
-  String? _torboxMsg;
 
   @override
   void initState() {
@@ -37,8 +35,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
     _tzNameCtrl.dispose();
     _tzUrlCtrl.dispose();
     _tzKeyCtrl.dispose();
-    _tbLabelCtrl.dispose();
-    _tbKeyCtrl.dispose();
     super.dispose();
   }
 
@@ -66,42 +62,13 @@ class _SettingsDialogState extends State<SettingsDialog> {
     });
   }
 
-  Future<void> _addTorboxProfile() async {
-    final key = _tbKeyCtrl.text.trim();
-    if (key.isEmpty) return;
-    setState(() {
-      _addingTorbox = true;
-      _torboxMsg = null;
-    });
-    try {
-      final p = await _torbox.addProfile(
-        label: _tbLabelCtrl.text,
-        apiKey: key,
-        makeActive: true,
-      );
-      if (!mounted) return;
-      setState(() {
-        _addingTorbox = false;
-        _tbLabelCtrl.clear();
-        _tbKeyCtrl.clear();
-        _torboxMsg = '✅ Profil « ${p.label} » ajouté (${p.planLabel}).';
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _addingTorbox = false;
-        _torboxMsg = '⛔ $e';
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final tbProfiles = widget.storage.torboxProfiles;
+    final seedrAccounts = widget.storage.seedrAccounts;
 
     return AlertDialog(
       backgroundColor: const Color(0xFF111C33),
-      title: const Text('⚙️ Réglages sécurité, Cloud & sources'),
+      title: const Text('⚙️ Réglages sécurité, Seedr & sources'),
       content: SizedBox(
         width: 560,
         child: SingleChildScrollView(
@@ -125,83 +92,58 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 subtitle: const Text('Protège contre les faux fichiers piégés par mot de passe'),
               ),
               const Divider(),
-              const Text(
-                '⚡ Profils TorBox (clés API locales)',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      '☁️ Comptes Seedr famille',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  if (widget.onOpenSeedrTab != null)
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        widget.onOpenSeedrTab!.call();
+                      },
+                      icon: const Icon(Icons.person_add_alt_1_outlined, size: 17),
+                      label: const Text('Gérer / Ajouter'),
+                    ),
+                ],
               ),
-              const SizedBox(height: 6),
-              if (tbProfiles.isEmpty)
-                const Text(
-                  'Aucun profil TorBox configuré.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+              if (seedrAccounts.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    'Aucun compte Seedr connecté. Ouvrez l\'onglet Seedr pour connecter un ou plusieurs comptes familiaux.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  ),
                 )
               else
-                ...tbProfiles.map(
-                  (p) => ListTile(
+                ...seedrAccounts.map(
+                  (acc) => ListTile(
                     dense: true,
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      p.isPremium ? Icons.workspace_premium : Icons.person_outline,
-                      color: p.isPremium ? const Color(0xFFFBBF24) : const Color(0xFF94A3B8),
-                    ),
-                    title: Text('${p.label} — ${p.planLabel}'),
+                    leading: const Icon(Icons.cloud_done_outlined, color: Color(0xFF22C55E)),
+                    title: Text(acc.displayName),
                     subtitle: Text(
-                      p.isPremium
-                          ? 'Sans limite${p.email != null ? ' • ${p.email}' : ''}'
-                          : (p.isInCooldown()
-                              ? '⏳ Cooldown : ${TorboxProfile.formatDuration(p.remainingCooldown())}'
-                              : 'Disponible${p.email != null ? ' • ${p.email}' : ''}'),
+                      [
+                        if (acc.username != null && acc.username != acc.displayName) acc.username!,
+                        if (acc.lastSpaceFree != null && acc.lastSpaceMax != null)
+                          'Libre : ${ReleaseParser.formatSize(acc.lastSpaceFree!)} / ${ReleaseParser.formatSize(acc.lastSpaceMax!)}',
+                      ].join(' • '),
                       style: const TextStyle(fontSize: 12),
                     ),
                     trailing: IconButton(
+                      tooltip: 'Supprimer ce compte',
                       icon: const Icon(Icons.close, size: 18),
                       onPressed: () async {
-                        await widget.storage.deleteTorboxProfile(p.id);
+                        await widget.storage.deleteSeedrAccount(acc.id);
                         setState(() {});
                       },
                     ),
                   ),
                 ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _tbLabelCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Profil (ex : Moi, Sœur)',
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      controller: _tbKeyCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Clé API TorBox',
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  OutlinedButton(
-                    onPressed: _addingTorbox ? null : _addTorboxProfile,
-                    child: _addingTorbox
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Ajouter'),
-                  ),
-                ],
-              ),
-              if (_torboxMsg != null) ...[
-                const SizedBox(height: 6),
-                Text(_torboxMsg!, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-              ],
               const Divider(),
               const Text(
                 '🔎 10 sources intégrées (sans pub / sans navigateur JS)',

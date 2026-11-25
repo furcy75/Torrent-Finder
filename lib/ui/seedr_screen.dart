@@ -27,8 +27,10 @@ class SeedrScreen extends StatefulWidget {
 class _SeedrScreenState extends State<SeedrScreen> {
   late final SeedrService _seedr = SeedrService(storage: widget.storage);
 
-  // Login UI state
+  // Add-account / login UI state
+  bool _showAddAccountForm = false;
   bool _useDeviceFlow = true;
+  final _labelCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _obscurePass = true;
@@ -58,7 +60,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
     super.didUpdateWidget(oldWidget);
     if (widget.refreshSignal != _lastHandledSignal) {
       _lastHandledSignal = widget.refreshSignal;
-      if (_seedr.isConnected) {
+      if (_seedr.isConnected && !_showAddAccountForm) {
         _loadFolder(folderId: _currentFolderId);
       }
     }
@@ -68,6 +70,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
   void dispose() {
     _devicePollTimer?.cancel();
     _liveTransferTimer?.cancel();
+    _labelCtrl.dispose();
     _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
@@ -76,10 +79,12 @@ class _SeedrScreenState extends State<SeedrScreen> {
   String? get _currentFolderId => _folderStack.isEmpty ? null : _folderStack.last.$1;
 
   void _syncLiveTransferTimer() {
-    final hasTransfers = (_contents?.torrents.isNotEmpty ?? false) && _seedr.isConnected;
+    final hasTransfers = (_contents?.torrents.isNotEmpty ?? false) &&
+        _seedr.isConnected &&
+        !_showAddAccountForm;
     if (hasTransfers && _liveTransferTimer == null) {
       _liveTransferTimer = Timer.periodic(const Duration(seconds: 6), (_) {
-        if (mounted && _seedr.isConnected && !_loadingFolder) {
+        if (mounted && _seedr.isConnected && !_loadingFolder && !_showAddAccountForm) {
           _loadFolder(folderId: _currentFolderId, silent: true);
         }
       });
@@ -87,6 +92,26 @@ class _SeedrScreenState extends State<SeedrScreen> {
       _liveTransferTimer?.cancel();
       _liveTransferTimer = null;
     }
+  }
+
+  Future<void> _switchAccount(String accountId) async {
+    if (widget.storage.activeSeedrAccount?.id == accountId && !_showAddAccountForm) {
+      await _loadFolder(folderId: _currentFolderId);
+      return;
+    }
+    _devicePollTimer?.cancel();
+    await widget.storage.setActiveSeedrAccount(accountId);
+    if (!mounted) return;
+    setState(() {
+      _showAddAccountForm = false;
+      _pendingDeviceCode = null;
+      _authError = null;
+      _contents = null;
+      _folderStack.clear();
+      _folderError = null;
+    });
+    widget.onSessionChanged();
+    await _loadFolder();
   }
 
   // -------------------------------------------------------------------
@@ -121,17 +146,24 @@ class _SeedrScreenState extends State<SeedrScreen> {
     final pending = _pendingDeviceCode;
     if (pending == null) return;
     try {
-      final session = await _seedr.pollDeviceAuthorization(pending.deviceCode);
+      final session = await _seedr.pollDeviceAuthorization(
+        pending.deviceCode,
+        label: _labelCtrl.text,
+      );
       if (!mounted) return;
       if (session != null) {
         _devicePollTimer?.cancel();
         _devicePollTimer = null;
+        _labelCtrl.clear();
         setState(() {
           _pendingDeviceCode = null;
           _authError = null;
+          _showAddAccountForm = false;
+          _contents = null;
+          _folderStack.clear();
         });
         widget.onSessionChanged();
-        _showSnack('Compte Seedr connecté avec succès !');
+        _showSnack('Compte Seedr « ${session.displayName} » connecté !');
         await _loadFolder();
       } else if (!silent) {
         _showSnack('En attente de validation sur seedr.cc/devices...');
@@ -163,12 +195,23 @@ class _SeedrScreenState extends State<SeedrScreen> {
       _authError = null;
     });
     try {
-      await _seedr.loginWithPassword(email: email, password: pass);
+      final session = await _seedr.loginWithPassword(
+        email: email,
+        password: pass,
+        label: _labelCtrl.text,
+      );
+      _labelCtrl.clear();
+      _emailCtrl.clear();
       _passCtrl.clear();
       if (!mounted) return;
-      setState(() => _authBusy = false);
+      setState(() {
+        _authBusy = false;
+        _showAddAccountForm = false;
+        _contents = null;
+        _folderStack.clear();
+      });
       widget.onSessionChanged();
-      _showSnack('Compte Seedr connecté !');
+      _showSnack('Compte Seedr « ${session.displayName} » connecté !');
       await _loadFolder();
     } catch (e) {
       if (!mounted) return;
@@ -179,24 +222,80 @@ class _SeedrScreenState extends State<SeedrScreen> {
     }
   }
 
-  Future<void> _logout() async {
+  Future<void> _promptRenameAccount(SeedrSession account) async {
+    final ctrl = TextEditingController(text: account.displayName);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF111C33),
+        title: const Text('Renommer ce profil Seedr'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Nom du profil (ex : Moi, Sœur, Fille)'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (newName == null || newName.isEmpty) return;
+    await widget.storage.renameSeedrAccount(account.id, newName);
+    if (!mounted) return;
+    setState(() {});
+    widget.onSessionChanged();
+  }
+
+  Future<void> _disconnectActiveAccount() async {
+    final active = _seedr.activeAccount;
+    if (active == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF111C33),
+        title: const Text('Déconnecter ce compte Seedr ?'),
+        content: Text(
+          'Voulez-vous retirer le profil « ${active.displayName} » de cet appareil ?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Déconnecter'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
     _liveTransferTimer?.cancel();
     _liveTransferTimer = null;
-    await _seedr.logout();
+    await _seedr.disconnectAccount(active.id);
     if (!mounted) return;
     setState(() {
       _contents = null;
       _folderStack.clear();
       _folderError = null;
+      _showAddAccountForm = false;
     });
     widget.onSessionChanged();
-    _showSnack('Déconnecté de Seedr.');
+    _showSnack('Compte « ${active.displayName} » déconnecté.');
+    if (_seedr.isConnected) {
+      await _loadFolder();
+    }
   }
 
   // -------------------------------------------------------------------
   // Live Seedr Folder / Transfer / Download Operations
   // -------------------------------------------------------------------
   Future<void> _loadFolder({String? folderId, bool silent = false}) async {
+    final active = _seedr.activeAccount;
+    if (active == null) return;
     if (!silent) {
       setState(() {
         _loadingFolder = true;
@@ -204,7 +303,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
       });
     }
     try {
-      final data = await _seedr.listContents(folderId: folderId);
+      final data = await _seedr.listContents(account: active, folderId: folderId);
       if (!mounted) return;
       setState(() {
         _loadingFolder = false;
@@ -217,10 +316,6 @@ class _SeedrScreenState extends State<SeedrScreen> {
         _loadingFolder = false;
         _folderError = e.message;
       });
-      if (e.authExpired) {
-        await _seedr.logout();
-        widget.onSessionChanged();
-      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -277,7 +372,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF111C33),
         title: const Text('Supprimer de Seedr ?'),
-        content: Text('Voulez-vous supprimer « $label » de votre espace Seedr ?'),
+        content: Text('Voulez-vous supprimer « $label » de cet espace Seedr ?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
           FilledButton(
@@ -299,12 +394,14 @@ class _SeedrScreenState extends State<SeedrScreen> {
   }
 
   Future<void> _promptAddManualMagnet() async {
+    final active = _seedr.activeAccount;
+    if (active == null) return;
     final ctrl = TextEditingController();
     final magnet = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF111C33),
-        title: const Text('Ajouter un lien Magnet sur Seedr'),
+        title: Text('Ajouter un Magnet sur « ${active.displayName} »'),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -324,8 +421,8 @@ class _SeedrScreenState extends State<SeedrScreen> {
     ctrl.dispose();
     if (magnet == null || magnet.isEmpty) return;
     try {
-      final msg = await _seedr.addMagnet(magnet);
-      _showSnack('☁️ $msg');
+      final msg = await _seedr.addMagnet(magnet, account: active);
+      _showSnack('☁️ ${active.displayName} : $msg');
       await _loadFolder(folderId: _currentFolderId);
     } catch (e) {
       _showSnack('$e');
@@ -339,51 +436,140 @@ class _SeedrScreenState extends State<SeedrScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final showLogin = !_seedr.isConnected || _showAddAccountForm;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 960),
-        child: _seedr.isConnected ? _buildDashboard() : _buildLoginView(),
+        child: showLogin ? _buildLoginView() : _buildDashboard(),
       ),
     );
   }
 
   // -------------------------------------------------------------------
-  // Login View (Device Code OAuth + Email/Password OAuth)
+  // Family Accounts Switcher Card
+  // -------------------------------------------------------------------
+  Widget _buildFamilyAccountsBar() {
+    final accounts = _seedr.accounts;
+    final activeId = _seedr.activeAccount?.id;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.group_outlined, color: Color(0xFF38BDF8), size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  'Comptes Seedr famille (${accounts.length})',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () {
+                    _devicePollTimer?.cancel();
+                    setState(() {
+                      _showAddAccountForm = true;
+                      _pendingDeviceCode = null;
+                      _authError = null;
+                    });
+                  },
+                  icon: const Icon(Icons.person_add_alt_1_outlined, size: 17),
+                  label: const Text('Ajouter un compte'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: accounts.map((acc) {
+                final selected = acc.id == activeId && !_showAddAccountForm;
+                final free = acc.lastSpaceFree;
+                final suffix = free != null ? ' • ${ReleaseParser.formatSize(free)} libre' : '';
+                return ChoiceChip(
+                  selected: selected,
+                  onSelected: (_) => _switchAccount(acc.id),
+                  avatar: Icon(
+                    selected ? Icons.cloud_done : Icons.cloud_outlined,
+                    size: 16,
+                    color: selected ? const Color(0xFF22C55E) : const Color(0xFF94A3B8),
+                  ),
+                  label: Text('${acc.displayName}$suffix'),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------
+  // Login View (Add First or Additional Family Account)
   // -------------------------------------------------------------------
   Widget _buildLoginView() {
     final pending = _pendingDeviceCode;
+    final hasExistingAccounts = _seedr.isConnected;
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (hasExistingAccounts) _buildFamilyAccountsBar(),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.cloud_outlined, color: Color(0xFF38BDF8), size: 30),
-                    SizedBox(width: 10),
+                    const Icon(Icons.cloud_outlined, color: Color(0xFF38BDF8), size: 30),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Connexion à Seedr.cc',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                            hasExistingAccounts
+                                ? 'Ajouter un compte Seedr famille'
+                                : 'Connexion à Seedr.cc',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                           ),
-                          Text(
-                            'Téléchargez vos films sur le cloud Seedr et gérez votre espace en direct.',
+                          const Text(
+                            'Connectez un ou plusieurs comptes familiaux et choisissez celui à utiliser selon le quota disponible.',
                             style: TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
                           ),
                         ],
                       ),
                     ),
+                    if (hasExistingAccounts)
+                      TextButton.icon(
+                        onPressed: () {
+                          _devicePollTimer?.cancel();
+                          setState(() {
+                            _showAddAccountForm = false;
+                            _pendingDeviceCode = null;
+                            _authError = null;
+                          });
+                        },
+                        icon: const Icon(Icons.arrow_back, size: 16),
+                        label: const Text('Retour'),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 16),
+                TextField(
+                  controller: _labelCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Nom du profil (ex : Moi, Sœur, Fille)',
+                    prefixIcon: Icon(Icons.badge_outlined),
+                  ),
+                ),
+                const SizedBox(height: 14),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -563,9 +749,11 @@ class _SeedrScreenState extends State<SeedrScreen> {
   // Connected Live Dashboard
   // -------------------------------------------------------------------
   Widget _buildDashboard() {
-    final s = _seedr.session!;
+    final s = _seedr.activeAccount!;
     final c = _contents;
-    final ratio = c?.usedRatio ?? 0.0;
+    final ratio = c?.usedRatio ?? s.usedRatio;
+    final spaceUsed = c?.spaceUsed ?? s.lastSpaceUsed ?? 0;
+    final spaceMax = c?.spaceMax ?? s.lastSpaceMax ?? 0;
     final barColor = ratio > 0.9
         ? const Color(0xFFEF4444)
         : ratio > 0.75
@@ -577,7 +765,9 @@ class _SeedrScreenState extends State<SeedrScreen> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Account & Quota Card
+          _buildFamilyAccountsBar(),
+
+          // Active Account & Quota Card
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -593,15 +783,14 @@ class _SeedrScreenState extends State<SeedrScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              s.username ?? s.email ?? 'Compte Seedr connecté',
+                              s.displayName,
                               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                             ),
                             Text(
                               [
+                                if (s.username != null && s.username != s.displayName) s.username!,
                                 if (s.packageName != null) 'Offre : ${s.packageName}',
-                                s.authMode == 'device'
-                                    ? 'Connexion : Code Appareil'
-                                    : 'Connexion : OAuth Email',
+                                s.authMode == 'device' ? 'Code Appareil' : 'OAuth Email',
                               ].join(' • '),
                               style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                             ),
@@ -609,29 +798,35 @@ class _SeedrScreenState extends State<SeedrScreen> {
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Renommer ce profil',
+                        onPressed: () => _promptRenameAccount(s),
+                        icon: const Icon(Icons.edit_outlined, size: 20),
+                      ),
+                      IconButton(
                         tooltip: 'Actualiser Seedr',
-                        onPressed: _loadingFolder ? null : () => _loadFolder(folderId: _currentFolderId),
+                        onPressed:
+                            _loadingFolder ? null : () => _loadFolder(folderId: _currentFolderId),
                         icon: const Icon(Icons.refresh),
                       ),
                       IconButton(
-                        tooltip: 'Déconnexion Seedr',
-                        onPressed: _logout,
+                        tooltip: 'Déconnecter ce compte',
+                        onPressed: _disconnectActiveAccount,
                         icon: const Icon(Icons.logout, color: Color(0xFFEF4444)),
                       ),
                     ],
                   ),
-                  if (c != null && c.spaceMax > 0) ...[
+                  if (spaceMax > 0) ...[
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Espace utilisé : ${ReleaseParser.formatSize(c.spaceUsed)} / ${ReleaseParser.formatSize(c.spaceMax)}',
+                          'Espace utilisé : ${ReleaseParser.formatSize(spaceUsed)} / ${ReleaseParser.formatSize(spaceMax)}',
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                         ),
                         Text(
-                          'Libre : ${ReleaseParser.formatSize((c.spaceMax - c.spaceUsed).clamp(0, c.spaceMax))}',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                          'Libre : ${ReleaseParser.formatSize((spaceMax - spaceUsed).clamp(0, spaceMax))}',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF86EFAC)),
                         ),
                       ],
                     ),
@@ -754,7 +949,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
                 Expanded(
                   child: Text(
                     _folderStack.isEmpty
-                        ? '📁 Mes fichiers Seedr'
+                        ? '📁 Fichiers Seedr (${s.displayName})'
                         : '📁 ${_folderStack.map((e) => e.$2).join(' / ')}',
                     style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                   ),
@@ -867,7 +1062,11 @@ class _SeedrScreenState extends State<SeedrScreen> {
                               id: f.folderFileId,
                               label: f.name,
                             ),
-                            icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFFEF4444)),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              size: 16,
+                              color: Color(0xFFEF4444),
+                            ),
                             label: const Text(
                               'Supprimer',
                               style: TextStyle(color: Color(0xFFEF4444)),
