@@ -61,7 +61,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
       backgroundColor: const Color(0xFF111C33),
       title: const Text('⚙️ Réglages sécurité & sources'),
       content: SizedBox(
-        width: 520,
+        width: 540,
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,24 +80,24 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 value: _draft.blockArchives,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(blockArchives: v)),
                 title: const Text('Bloquer les archives (.zip, .rar, .7z)'),
-                subtitle: const Text('Protège contre les faux films piégés par mot de passe'),
+                subtitle: const Text('Protège contre les faux fichiers piégés par mot de passe'),
               ),
               const Divider(),
               const Text(
-                '🔎 Sources intégrées (APIs JSON sans pub / sans JS)',
+                '🔎 10 sources intégrées (sans pub / sans navigateur JS)',
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.enableYts,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(enableYts: v)),
-                title: const Text('YTS (HD / 4K — .torrent directs)'),
+                title: const Text('YTS (Films HD / 4K — .torrent directs)'),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.enableApibay,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(enableApibay: v)),
-                title: const Text('APIBay (JSON pur — NFO détaillé)'),
+                title: const Text('APIBay (Films & Séries — NFO détaillé)'),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
@@ -116,6 +116,30 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 value: _draft.enableSolidTorrents,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(enableSolidTorrents: v)),
                 title: const Text('SolidTorrents (API JSON vidéo)'),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _draft.enableEztv,
+                onChanged: (v) => setState(() => _draft = _draft.copyWith(enableEztv: v)),
+                title: const Text('EZTV (Spécialiste Séries TV — .torrent directs)'),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _draft.enableBitSearch,
+                onChanged: (v) => setState(() => _draft = _draft.copyWith(enableBitSearch: v)),
+                title: const Text('BitSearch (Méta-index Films & Séries)'),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _draft.enableNyaa,
+                onChanged: (v) => setState(() => _draft = _draft.copyWith(enableNyaa: v)),
+                title: const Text('Nyaa (RSS Anime & Animation — .torrent directs)'),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _draft.enableLimeTorrents,
+                onChanged: (v) => setState(() => _draft = _draft.copyWith(enableLimeTorrents: v)),
+                title: const Text('LimeTorrents (RSS Films & Séries — .torrent directs)'),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,

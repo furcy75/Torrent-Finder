@@ -14,7 +14,7 @@ import 'package:safetorrent/ui/widgets/country_flag.dart';
 
 enum _SortMode { seeders, quality, sizeDesc, sizeAsc }
 
-enum _SearchStage { input, pickMovie, results }
+enum _SearchStage { input, pickMedia, results }
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({
@@ -41,11 +41,13 @@ class _SearchScreenState extends State<SearchScreen> {
   final _allocineService = AllocineService();
   final _indexersService = IndexersService();
 
+  MediaType _mediaType = MediaType.movie;
   _SearchStage _stage = _SearchStage.input;
 
-  // Selected movie from step 2 (AlloCiné / Wikidata / IMDb) and active title choices
-  MovieSuggestion? _selectedMovie;
+  // Selected movie or TV series (retains posterUrl, localized titles & series schedule!)
+  MovieSuggestion? _selectedMedia;
   final Set<String> _activeSearchTitles = {};
+  String? _selectedSeasonTag; // null (all), 'S01', 'S02', ..., or 'Complete'
 
   // Quick filter tags organized by category rows (CAM/TS excluded by default)
   final Set<String> _langResultFilters = {}; // 'FR', 'EN', 'ES', 'MULTI'
@@ -74,23 +76,69 @@ class _SearchScreenState extends State<SearchScreen> {
     if (widget.triggerId != _lastHandledTrigger && widget.pendingRequest != null) {
       _lastHandledTrigger = widget.triggerId;
       final req = widget.pendingRequest!;
-      _movieCtrl.text = req.query;
-      _selectedMovie = MovieSuggestion(
-        titleFr: req.query,
-        titleOriginal: (req.originalTitle ?? '').trim().isNotEmpty
-            ? req.originalTitle!.trim()
-            : req.query,
-        titleEn: (req.originalTitle ?? '').trim().isNotEmpty ? req.originalTitle!.trim() : null,
-        year: req.year,
-        source: 'Liste sauvegardée',
-      );
+      final media = req.movie;
+      _mediaType = media.mediaType;
+      _movieCtrl.text = media.titleFr;
+      _selectedMedia = media;
+      _selectedSeasonTag = null;
       _activeSearchTitles
         ..clear()
-        ..addAll(_selectedMovie!.allDistinctTitles);
+        ..addAll(media.allDistinctTitles);
       _activeWatchlistId = req.watchlistId;
       _suggestions = [];
       _stage = _SearchStage.results;
       _performTorrentSearch();
+
+      // If this saved item did not yet have a posterUrl, try enriching it silently
+      if (media.posterUrl == null || media.posterUrl!.isEmpty) {
+        _silentlyEnrichPoster(media, req.watchlistId);
+      }
+    }
+  }
+
+  Future<void> _silentlyEnrichPoster(MovieSuggestion media, String? watchlistId) async {
+    final hits = await _allocineService.resolveTitles(
+      media.titleFr,
+      mediaType: media.mediaType,
+      limit: 2,
+    );
+    if (!mounted || hits.isEmpty) return;
+    final match = hits.firstWhere(
+      (h) => h.posterUrl != null && h.posterUrl!.isNotEmpty,
+      orElse: () => hits.first,
+    );
+    if (match.posterUrl == null || match.posterUrl!.isEmpty) return;
+
+    setState(() {
+      if (_selectedMedia?.titleFr == media.titleFr) {
+        _selectedMedia = _selectedMedia?.copyWith(
+          posterUrl: match.posterUrl,
+          titleEn: _selectedMedia?.titleEn ?? match.titleEn,
+          titleEs: _selectedMedia?.titleEs ?? match.titleEs,
+          tvMazeId: _selectedMedia?.tvMazeId ?? match.tvMazeId,
+          seriesStatus: _selectedMedia?.seriesStatus ?? match.seriesStatus,
+          seasonCount: _selectedMedia?.seasonCount ?? match.seasonCount,
+          nextSeasonInfo: _selectedMedia?.nextSeasonInfo ?? match.nextSeasonInfo,
+          nextReleaseDate: _selectedMedia?.nextReleaseDate ?? match.nextReleaseDate,
+        );
+      }
+    });
+
+    if (watchlistId != null) {
+      final idx = widget.storage.watchlist.indexWhere((e) => e.id == watchlistId);
+      if (idx != -1) {
+        await widget.storage.updateWatchlistItem(
+          widget.storage.watchlist[idx].copyWith(
+            posterUrl: match.posterUrl,
+            tvMazeId: match.tvMazeId,
+            seriesStatus: match.seriesStatus,
+            seasonCount: match.seasonCount,
+            nextSeasonInfo: match.nextSeasonInfo,
+            nextReleaseDate: match.nextReleaseDate,
+          ),
+        );
+        widget.onDataChanged();
+      }
     }
   }
 
@@ -106,7 +154,8 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() {
       _movieCtrl.clear();
       _stage = _SearchStage.input;
-      _selectedMovie = null;
+      _selectedMedia = null;
+      _selectedSeasonTag = null;
       _activeSearchTitles.clear();
       _suggestions = [];
       _results = [];
@@ -150,12 +199,16 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   // -------------------------------------------------------------------
-  // Step 1 -> Step 2: Identify movie via AlloCiné / Wikidata / IMDb
+  // Step 1 -> Step 2: Identify movie or series via AlloCiné / TVMaze / Wikidata
   // -------------------------------------------------------------------
-  Future<void> _identifyMovie() async {
+  Future<void> _identifyMedia() async {
     final query = _movieCtrl.text.trim();
     if (query.isEmpty) {
-      _showSnack('Saisissez d\'abord le nom d\'un film.');
+      _showSnack(
+        _mediaType == MediaType.series
+            ? 'Saisissez d\'abord le nom d\'une série.'
+            : 'Saisissez d\'abord le nom d\'un film.',
+      );
       _movieFocus.requestFocus();
       return;
     }
@@ -163,14 +216,15 @@ class _SearchScreenState extends State<SearchScreen> {
 
     setState(() {
       _loadingTitles = true;
-      _stage = _SearchStage.pickMovie;
+      _stage = _SearchStage.pickMedia;
       _suggestions = [];
-      _selectedMovie = null;
+      _selectedMedia = null;
+      _selectedSeasonTag = null;
       _results = [];
       _hasSearchedTorrents = false;
     });
 
-    final hits = await _allocineService.resolveMovieTitles(query);
+    final hits = await _allocineService.resolveTitles(query, mediaType: _mediaType);
     if (!mounted) return;
     setState(() {
       _loadingTitles = false;
@@ -179,13 +233,15 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   // -------------------------------------------------------------------
-  // Step 2 -> Step 3: Pick movie match & display vignette + titles
+  // Step 2 -> Step 3: Pick movie/series match & display vignette + titles
   // -------------------------------------------------------------------
-  void _selectMovieAndSearch(MovieSuggestion movie, {bool autoLaunchTorrents = true}) {
-    final titles = movie.allDistinctTitles;
+  void _selectMediaAndSearch(MovieSuggestion media, {bool autoLaunchTorrents = true}) {
+    final titles = media.allDistinctTitles;
     setState(() {
-      _selectedMovie = movie;
-      _movieCtrl.text = movie.titleFr;
+      _selectedMedia = media;
+      _mediaType = media.mediaType;
+      _movieCtrl.text = media.titleFr;
+      _selectedSeasonTag = null;
       _activeSearchTitles
         ..clear()
         ..addAll(titles);
@@ -198,23 +254,24 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  /// Bypass AlloCiné/Wikidata matching and search torrents directly with user's input.
+  /// Bypass matching and search torrents directly with user's input.
   void _skipMatchingAndSearchDirect() {
     final query = _movieCtrl.text.trim();
     if (query.isEmpty) {
-      _showSnack('Saisissez d\'abord le nom d\'un film.');
+      _showSnack('Saisissez d\'abord un titre.');
       return;
     }
     final manual = MovieSuggestion(
       titleFr: query,
       titleOriginal: query,
+      mediaType: _mediaType,
       source: 'Recherche directe',
     );
-    _selectMovieAndSearch(manual, autoLaunchTorrents: true);
+    _selectMediaAndSearch(manual, autoLaunchTorrents: true);
   }
 
   // -------------------------------------------------------------------
-  // Step 3: Execute torrent search with selected titles (all languages)
+  // Step 3: Execute torrent search with selected titles & optional season tag
   // -------------------------------------------------------------------
   Future<void> _performTorrentSearch() async {
     final activeList = _activeSearchTitles.toList();
@@ -236,7 +293,9 @@ class _SearchScreenState extends State<SearchScreen> {
     final summary = await _indexersService.search(
       query: primaryQuery,
       extraTitles: activeList.skip(1).toList(),
-      year: _selectedMovie?.year,
+      mediaType: _selectedMedia?.mediaType ?? _mediaType,
+      seasonQueryTag: _selectedSeasonTag,
+      year: _selectedMedia?.year,
       includeAllLanguages: true,
       settings: widget.storage.settings,
     );
@@ -247,6 +306,7 @@ class _SearchScreenState extends State<SearchScreen> {
         final item = widget.storage.watchlist[idx];
         await widget.storage.updateWatchlistItem(
           item.copyWith(
+            posterUrl: _selectedMedia?.posterUrl ?? item.posterUrl,
             found: summary.results.isNotEmpty,
             lastResultCount: summary.results.length,
             lastCheckedAt: DateTime.now().toUtc(),
@@ -265,16 +325,16 @@ class _SearchScreenState extends State<SearchScreen> {
     widget.onDataChanged();
   }
 
-  Future<void> _saveForLater() async {
-    final titleFr = _selectedMovie?.titleFr ?? _movieCtrl.text.trim();
+  Future<void> _saveForLater({MovieSuggestion? overrideMedia}) async {
+    final m = overrideMedia ?? _selectedMedia;
+    final titleFr = m?.titleFr ?? _movieCtrl.text.trim();
     if (titleFr.isEmpty) {
-      _showSnack('Saisissez d\'abord un nom de film.');
+      _showSnack('Saisissez d\'abord un titre.');
       return;
     }
-    final titleOrig = _selectedMovie?.titleEn ??
-        (_selectedMovie != null &&
-                _selectedMovie!.titleOriginal.toLowerCase() != titleFr.toLowerCase()
-            ? _selectedMovie!.titleOriginal
+    final titleOrig = m?.titleEn ??
+        (m != null && m.titleOriginal.toLowerCase() != titleFr.toLowerCase()
+            ? m.titleOriginal
             : null);
 
     final added = await widget.storage.addToWatchlist(
@@ -282,15 +342,24 @@ class _SearchScreenState extends State<SearchScreen> {
         id: '${DateTime.now().microsecondsSinceEpoch}',
         titleFr: titleFr,
         titleOriginal: titleOrig,
+        titleEn: m?.titleEn,
+        titleEs: m?.titleEs,
+        posterUrl: m?.posterUrl,
+        mediaType: m?.mediaType ?? _mediaType,
+        tvMazeId: m?.tvMazeId,
+        seriesStatus: m?.seriesStatus,
+        seasonCount: m?.seasonCount,
+        nextSeasonInfo: m?.nextSeasonInfo,
+        nextReleaseDate: m?.nextReleaseDate,
         languages: const [LanguageFilter.all],
-        year: _selectedMovie?.year,
+        year: m?.year,
         createdAt: DateTime.now().toUtc(),
       ),
     );
     widget.onDataChanged();
     _showSnack(
       added
-          ? '« $titleFr » sauvegardé dans « Plus tard ».'
+          ? '« $titleFr » sauvegardé dans « Plus tard » (avec sa vignette).'
           : '« $titleFr » est déjà dans votre liste « Plus tard ».',
     );
   }
@@ -417,8 +486,9 @@ class _SearchScreenState extends State<SearchScreen> {
     final visibleResults = _filteredAndSortedResults;
     final canReset = _stage != _SearchStage.input ||
         _movieCtrl.text.isNotEmpty ||
-        _selectedMovie != null ||
+        _selectedMedia != null ||
         _results.isNotEmpty;
+    final isSeries = _mediaType == MediaType.series;
 
     return Center(
       child: ConstrainedBox(
@@ -435,13 +505,13 @@ class _SearchScreenState extends State<SearchScreen> {
                     runSpacing: 6,
                     children: [
                       _stepPill(
-                        '1. Film',
+                        isSeries ? '1. Série' : '1. Film',
                         active: _stage == _SearchStage.input,
                         done: _stage != _SearchStage.input,
                       ),
                       _stepPill(
                         '2. Correspondance',
-                        active: _stage == _SearchStage.pickMovie,
+                        active: _stage == _SearchStage.pickMedia,
                         done: _stage == _SearchStage.results,
                       ),
                       _stepPill(
@@ -462,23 +532,44 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
             const SizedBox(height: 12),
 
-            // STEP 1: Clean title-only search card (no year, no language selector)
+            // STEP 1: Clean title-only search card + Films / Séries toggle
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ChoiceChip(
+                          selected: _mediaType == MediaType.movie,
+                          onSelected: (_) => setState(() => _mediaType = MediaType.movie),
+                          avatar: const Icon(Icons.movie_outlined, size: 17),
+                          label: const Text('Films'),
+                        ),
+                        ChoiceChip(
+                          selected: _mediaType == MediaType.series,
+                          onSelected: (_) => setState(() => _mediaType = MediaType.series),
+                          avatar: const Icon(Icons.tv_outlined, size: 17),
+                          label: const Text('Séries TV'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: _movieCtrl,
                       focusNode: _movieFocus,
                       textInputAction: TextInputAction.search,
-                      onSubmitted: (_) => _identifyMovie(),
+                      onSubmitted: (_) => _identifyMedia(),
                       onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        labelText: 'Nom du film',
-                        hintText: 'Ex : Les Évadés, Dune, Inception...',
-                        prefixIcon: Icon(Icons.movie_outlined),
+                      decoration: InputDecoration(
+                        labelText: isSeries ? 'Nom de la série' : 'Nom du film',
+                        hintText: isSeries
+                            ? 'Ex : Severance, Stranger Things, La Casa de Papel...'
+                            : 'Ex : Les Évadés, Dune, Inception...',
+                        prefixIcon: Icon(isSeries ? Icons.tv_outlined : Icons.movie_outlined),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -487,7 +578,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       runSpacing: 8,
                       children: [
                         FilledButton.icon(
-                          onPressed: _loadingTitles ? null : _identifyMovie,
+                          onPressed: _loadingTitles ? null : _identifyMedia,
                           icon: _loadingTitles
                               ? const SizedBox(
                                   width: 16,
@@ -495,7 +586,11 @@ class _SearchScreenState extends State<SearchScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Icon(Icons.search),
-                          label: const Text('Identifier le film (AlloCiné / Bases)'),
+                          label: Text(
+                            isSeries
+                                ? 'Identifier la série (AlloCiné / TVMaze)'
+                                : 'Identifier le film (AlloCiné / Bases)',
+                          ),
                         ),
                         OutlinedButton.icon(
                           onPressed: _searchingTorrents ? null : _skipMatchingAndSearchDirect,
@@ -511,12 +606,12 @@ class _SearchScreenState extends State<SearchScreen> {
 
             const SizedBox(height: 14),
 
-            // STEP 2: Movie matching results (AlloCiné + Wikidata + IMDb)
-            if (_stage == _SearchStage.pickMovie) _buildStep2Suggestions(),
+            // STEP 2: Matching results (AlloCiné + TVMaze + Wikidata + IMDb)
+            if (_stage == _SearchStage.pickMedia) _buildStep2Suggestions(),
 
-            // STEP 3: Selected movie card (vignette + multilingual titles) & Torrent results
-            if (_stage == _SearchStage.results && _selectedMovie != null) ...[
-              _buildSelectedMovieBanner(_selectedMovie!),
+            // STEP 3: Selected movie/series card (poster + titles + seasons/dates)
+            if (_stage == _SearchStage.results && _selectedMedia != null) ...[
+              _buildSelectedMediaBanner(_selectedMedia!),
               const SizedBox(height: 12),
             ],
 
@@ -546,14 +641,16 @@ class _SearchScreenState extends State<SearchScreen> {
                     children: [
                       const Icon(Icons.movie_filter_outlined, size: 44, color: Color(0xFF94A3B8)),
                       const SizedBox(height: 10),
-                      const Text(
-                        'Aucun torrent trouvé pour ce film',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      Text(
+                        isSeries
+                            ? 'Aucun torrent trouvé pour cette série'
+                            : 'Aucun torrent trouvé pour ce film',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'Sauvegardez ce film dans « Plus tard » pour y retourner facilement, ou lancez une nouvelle recherche.',
+                        'Sauvegardez-le dans « Plus tard » pour y retourner facilement (sa vignette et ses dates seront conservées), ou lancez une nouvelle recherche.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Color(0xFF94A3B8)),
                       ),
@@ -682,14 +779,18 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildStep2Suggestions() {
     if (_loadingTitles) {
-      return const Card(
+      return Card(
         child: Padding(
-          padding: EdgeInsets.all(28),
+          padding: const EdgeInsets.all(28),
           child: Column(
             children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 12),
-              Text('Recherche du film sur AlloCiné, Wikidata et IMDb...'),
+              const CircularProgressIndicator(),
+              const SizedBox(height: 12),
+              Text(
+                _mediaType == MediaType.series
+                    ? 'Recherche de la série (AlloCiné, TVMaze, Wikidata)...'
+                    : 'Recherche du film (AlloCiné, Wikidata, IMDb)...',
+              ),
             ],
           ),
         ),
@@ -705,13 +806,13 @@ class _SearchScreenState extends State<SearchScreen> {
               const Icon(Icons.search_off_outlined, size: 42, color: Color(0xFF94A3B8)),
               const SizedBox(height: 8),
               const Text(
-                'Aucune fiche correspondante trouvée sur AlloCiné / Wikidata',
+                'Aucune fiche correspondante trouvée',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 6),
               const Text(
-                'Vous pouvez lancer directement la recherche de torrents avec votre texte ou sauvegarder ce film pour plus tard.',
+                'Vous pouvez lancer directement la recherche de torrents avec votre texte ou sauvegarder pour plus tard.',
                 style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                 textAlign: TextAlign.center,
               ),
@@ -745,9 +846,11 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Étape 2 — Sélectionnez le bon film pour lancer la recherche de torrents :',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+            Text(
+              _mediaType == MediaType.series
+                  ? 'Étape 2 — Sélectionnez la bonne série (dates des saisons incluses) :'
+                  : 'Étape 2 — Sélectionnez le bon film pour lancer la recherche de torrents :',
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
             ),
             const SizedBox(height: 10),
             ..._suggestions.map(_buildSuggestionCard),
@@ -758,7 +861,7 @@ class _SearchScreenState extends State<SearchScreen> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 const Text(
-                  'Vous ne trouvez pas le bon film ?',
+                  'Vous ne trouvez pas la bonne fiche ?',
                   style: TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
                 ),
                 OutlinedButton.icon(
@@ -789,7 +892,11 @@ class _SearchScreenState extends State<SearchScreen> {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: const Color(0xFF243559)),
         ),
-        child: const Icon(Icons.movie_outlined, color: Color(0xFF94A3B8), size: 30),
+        child: Icon(
+          _mediaType == MediaType.series ? Icons.tv_outlined : Icons.movie_outlined,
+          color: const Color(0xFF94A3B8),
+          size: 30,
+        ),
       );
     }
     return ClipRRect(
@@ -822,6 +929,41 @@ class _SearchScreenState extends State<SearchScreen> {
             text,
             style: TextStyle(color: fg, fontSize: 11.5, fontWeight: FontWeight.w700),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSeriesBadges(MovieSuggestion s) {
+    if (s.mediaType != MediaType.series) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 5,
+        children: [
+          if (s.seasonCount != null)
+            _pill(
+              '📺 ${s.seasonCount} saison${s.seasonCount! > 1 ? 's' : ''}',
+              const Color(0xFF1E3A8A),
+              const Color(0xFFBFDBFE),
+            ),
+          if (s.seriesStatus != null && s.seriesStatus!.isNotEmpty)
+            _pill(
+              s.seriesStatus!,
+              s.seriesStatus == 'En cours'
+                  ? const Color(0xFF14532D)
+                  : const Color(0xFF334155),
+              s.seriesStatus == 'En cours'
+                  ? const Color(0xFF86EFAC)
+                  : const Color(0xFFCBD5E1),
+            ),
+          if (s.nextSeasonInfo != null && s.nextSeasonInfo!.isNotEmpty)
+            _pill(
+              '📅 ${s.nextSeasonInfo}',
+              const Color(0xFF78350F),
+              const Color(0xFFFDE68A),
+            ),
         ],
       ),
     );
@@ -864,11 +1006,26 @@ class _SearchScreenState extends State<SearchScreen> {
                   spacing: 6,
                   runSpacing: 5,
                   children: [
-                    _flagPill('FR', 'FR : ${s.titleFr}', const Color(0xFF172542), const Color(0xFFE2E8F0)),
+                    _flagPill(
+                      'FR',
+                      'FR : ${s.titleFr}',
+                      const Color(0xFF172542),
+                      const Color(0xFFE2E8F0),
+                    ),
                     if (s.titleEn != null && s.titleEn!.isNotEmpty)
-                      _flagPill('EN', 'EN : ${s.titleEn}', const Color(0xFF172542), const Color(0xFF7DD3FC)),
+                      _flagPill(
+                        'EN',
+                        'EN : ${s.titleEn}',
+                        const Color(0xFF172542),
+                        const Color(0xFF7DD3FC),
+                      ),
                     if (s.titleEs != null && s.titleEs!.isNotEmpty)
-                      _flagPill('ES', 'ES : ${s.titleEs}', const Color(0xFF172542), const Color(0xFFFCD34D)),
+                      _flagPill(
+                        'ES',
+                        'ES : ${s.titleEs}',
+                        const Color(0xFF172542),
+                        const Color(0xFFFCD34D),
+                      ),
                     if (s.titleOriginal.toLowerCase() != s.titleFr.toLowerCase() &&
                         s.titleOriginal.toLowerCase() != (s.titleEn ?? '').toLowerCase() &&
                         s.titleOriginal.toLowerCase() != (s.titleEs ?? '').toLowerCase())
@@ -879,6 +1036,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                   ],
                 ),
+                _buildSeriesBadges(s),
                 if (s.synopsis != null && s.synopsis!.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(
@@ -894,13 +1052,18 @@ class _SearchScreenState extends State<SearchScreen> {
                   runSpacing: 6,
                   children: [
                     FilledButton.icon(
-                      onPressed: () => _selectMovieAndSearch(s, autoLaunchTorrents: true),
+                      onPressed: () => _selectMediaAndSearch(s, autoLaunchTorrents: true),
                       icon: const Icon(Icons.search, size: 17),
-                      label: const Text('Sélectionner & chercher les torrents'),
+                      label: const Text('Sélectionner & chercher'),
                     ),
                     OutlinedButton(
-                      onPressed: () => _selectMovieAndSearch(s, autoLaunchTorrents: false),
-                      child: const Text('Choisir les titres d\'abord'),
+                      onPressed: () => _selectMediaAndSearch(s, autoLaunchTorrents: false),
+                      child: const Text('Choisir titres / saison'),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => _saveForLater(overrideMedia: s),
+                      icon: const Icon(Icons.bookmark_add_outlined, size: 16),
+                      label: const Text('Plus tard'),
                     ),
                   ],
                 ),
@@ -912,15 +1075,17 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildSelectedMovieBanner(MovieSuggestion movie) {
-    final allTitles = movie.allDistinctTitles;
+  Widget _buildSelectedMediaBanner(MovieSuggestion media) {
+    final allTitles = media.allDistinctTitles;
     String? flagCodeForTitle(String t) {
       final low = t.toLowerCase();
-      if (low == movie.titleFr.toLowerCase()) return 'FR';
-      if (movie.titleEn != null && low == movie.titleEn!.toLowerCase()) return 'EN';
-      if (movie.titleEs != null && low == movie.titleEs!.toLowerCase()) return 'ES';
+      if (low == media.titleFr.toLowerCase()) return 'FR';
+      if (media.titleEn != null && low == media.titleEn!.toLowerCase()) return 'EN';
+      if (media.titleEs != null && low == media.titleEs!.toLowerCase()) return 'ES';
       return null;
     }
+
+    final maxSeasons = (media.seasonCount ?? 0).clamp(0, 12);
 
     return Card(
       color: const Color(0xFF13203B),
@@ -929,7 +1094,7 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildPoster(movie.posterUrl, width: 74, height: 110),
+            _buildPoster(media.posterUrl, width: 76, height: 112),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -939,20 +1104,25 @@ class _SearchScreenState extends State<SearchScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          '${movie.titleFr}${movie.year != null ? ' (${movie.year})' : ''}',
+                          '${media.titleFr}${media.year != null ? ' (${media.year})' : ''}',
                           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                         ),
                       ),
                       if (_suggestions.length > 1)
                         TextButton(
-                          onPressed: () => setState(() => _stage = _SearchStage.pickMovie),
-                          child: const Text('Changer de film'),
+                          onPressed: () => setState(() => _stage = _SearchStage.pickMedia),
+                          child: Text(
+                            media.mediaType == MediaType.series
+                                ? 'Changer de série'
+                                : 'Changer de film',
+                          ),
                         ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  _buildSeriesBadges(media),
+                  const SizedBox(height: 6),
                   const Text(
-                    'Titres utilisés pour la recherche torrent (cochez/décochez) :',
+                    'Titres utilisés pour la recherche torrent :',
                     style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                   ),
                   const SizedBox(height: 6),
@@ -986,6 +1156,44 @@ class _SearchScreenState extends State<SearchScreen> {
                       );
                     }).toList(),
                   ),
+
+                  // Quick Season selector for TV Series
+                  if (media.mediaType == MediaType.series) ...[
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Cibler une saison :',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        ChoiceChip(
+                          selected: _selectedSeasonTag == null,
+                          onSelected: (_) => setState(() => _selectedSeasonTag = null),
+                          label: const Text('Toutes', style: TextStyle(fontSize: 12)),
+                        ),
+                        for (var s = 1; s <= (maxSeasons > 0 ? maxSeasons : 5); s++)
+                          ChoiceChip(
+                            selected: _selectedSeasonTag == 'S${s.toString().padLeft(2, '0')}',
+                            onSelected: (_) => setState(
+                              () => _selectedSeasonTag = 'S${s.toString().padLeft(2, '0')}',
+                            ),
+                            label: Text(
+                              'S${s.toString().padLeft(2, '0')}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ChoiceChip(
+                          selected: _selectedSeasonTag == 'Complete',
+                          onSelected: (_) => setState(() => _selectedSeasonTag = 'Complete'),
+                          label: const Text('Intégrale', style: TextStyle(fontSize: 12)),
+                        ),
+                      ],
+                    ),
+                  ],
+
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
@@ -1200,7 +1408,6 @@ class _SearchScreenState extends State<SearchScreen> {
                   is4k ? const Color(0xFF4C1D95) : const Color(0xFF0C4A6E),
                   is4k ? const Color(0xFFD8B4FE) : const Color(0xFF7DD3FC),
                 ),
-                // Color vector CountryFlag image + language label directly on every torrent result
                 ...item.detectedLanguages.map(
                   (l) => _flagPill(
                     l,

@@ -39,6 +39,10 @@ class AppSettings {
     this.enableKnaben = true,
     this.enableTorrentCsv = true,
     this.enableSolidTorrents = true,
+    this.enableEztv = true,
+    this.enableBitSearch = true,
+    this.enableNyaa = true,
+    this.enableLimeTorrents = true,
     this.enableArchiveOrg = true,
     this.torznabIndexers = const [],
   });
@@ -50,6 +54,10 @@ class AppSettings {
   final bool enableKnaben;
   final bool enableTorrentCsv;
   final bool enableSolidTorrents;
+  final bool enableEztv;
+  final bool enableBitSearch;
+  final bool enableNyaa;
+  final bool enableLimeTorrents;
   final bool enableArchiveOrg;
   final List<TorznabConfig> torznabIndexers;
 
@@ -61,6 +69,10 @@ class AppSettings {
     bool? enableKnaben,
     bool? enableTorrentCsv,
     bool? enableSolidTorrents,
+    bool? enableEztv,
+    bool? enableBitSearch,
+    bool? enableNyaa,
+    bool? enableLimeTorrents,
     bool? enableArchiveOrg,
     List<TorznabConfig>? torznabIndexers,
   }) {
@@ -72,6 +84,10 @@ class AppSettings {
       enableKnaben: enableKnaben ?? this.enableKnaben,
       enableTorrentCsv: enableTorrentCsv ?? this.enableTorrentCsv,
       enableSolidTorrents: enableSolidTorrents ?? this.enableSolidTorrents,
+      enableEztv: enableEztv ?? this.enableEztv,
+      enableBitSearch: enableBitSearch ?? this.enableBitSearch,
+      enableNyaa: enableNyaa ?? this.enableNyaa,
+      enableLimeTorrents: enableLimeTorrents ?? this.enableLimeTorrents,
       enableArchiveOrg: enableArchiveOrg ?? this.enableArchiveOrg,
       torznabIndexers: torznabIndexers ?? this.torznabIndexers,
     );
@@ -85,6 +101,10 @@ class AppSettings {
         'enableKnaben': enableKnaben,
         'enableTorrentCsv': enableTorrentCsv,
         'enableSolidTorrents': enableSolidTorrents,
+        'enableEztv': enableEztv,
+        'enableBitSearch': enableBitSearch,
+        'enableNyaa': enableNyaa,
+        'enableLimeTorrents': enableLimeTorrents,
         'enableArchiveOrg': enableArchiveOrg,
         'torznabIndexers': torznabIndexers.map((e) => e.toJson()).toList(),
       };
@@ -97,6 +117,10 @@ class AppSettings {
         enableKnaben: json['enableKnaben'] as bool? ?? true,
         enableTorrentCsv: json['enableTorrentCsv'] as bool? ?? true,
         enableSolidTorrents: json['enableSolidTorrents'] as bool? ?? true,
+        enableEztv: json['enableEztv'] as bool? ?? true,
+        enableBitSearch: json['enableBitSearch'] as bool? ?? true,
+        enableNyaa: json['enableNyaa'] as bool? ?? true,
+        enableLimeTorrents: json['enableLimeTorrents'] as bool? ?? true,
         enableArchiveOrg: json['enableArchiveOrg'] as bool? ?? true,
         torznabIndexers: ((json['torznabIndexers'] as List?) ?? const [])
             .whereType<Map<String, dynamic>>()

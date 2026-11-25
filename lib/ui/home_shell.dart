@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:safetorrent/models/movie_suggestion.dart';
 import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/ui/search_screen.dart';
 import 'package:safetorrent/ui/settings_dialog.dart';
@@ -6,15 +7,11 @@ import 'package:safetorrent/ui/watchlist_screen.dart';
 
 class PendingSearchRequest {
   const PendingSearchRequest({
-    required this.query,
-    this.originalTitle,
-    this.year,
+    required this.movie,
     this.watchlistId,
   });
 
-  final String query;
-  final String? originalTitle;
-  final int? year;
+  final MovieSuggestion movie;
   final String? watchlistId;
 }
 
@@ -73,11 +70,24 @@ class _HomeShellState extends State<HomeShell> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF0F172A),
         titleSpacing: 16,
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.shield_outlined, color: Color(0xFF22C55E), size: 26),
-            SizedBox(width: 10),
-            Column(
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                'assets/icon/app_icon.png',
+                width: 30,
+                height: 30,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.shield_outlined,
+                  color: Color(0xFF22C55E),
+                  size: 26,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -85,7 +95,7 @@ class _HomeShellState extends State<HomeShell> {
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
                 ),
                 Text(
-                  'Autonome • Bac à sable actif',
+                  'Autonome • Films & Séries • Bac à sable actif',
                   style: TextStyle(
                     fontSize: 11,
                     color: Color(0xFF22C55E),

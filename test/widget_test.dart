@@ -7,7 +7,7 @@ import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/ui/widgets/country_flag.dart';
 
 void main() {
-  testWidgets('SafeTorrent launches with title-only search, no history tab, and reset button',
+  testWidgets('SafeTorrent launches with Films/Séries toggle, no history tab, and reset button',
       (tester) async {
     final tmpDir = Directory.systemTemp.createTempSync('safetorrent_widget_');
     addTearDown(() {
@@ -21,22 +21,29 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('SafeTorrent'), findsOneWidget);
+    expect(find.text('Films'), findsOneWidget);
+    expect(find.text('Séries TV'), findsOneWidget);
     expect(find.text('Identifier le film (AlloCiné / Bases)'), findsOneWidget);
     expect(find.text('Rechercher'), findsOneWidget);
     expect(find.text('Plus tard'), findsOneWidget);
 
-    // History, year field, and step-1 language selectors are removed
+    // History and year field are removed
     expect(find.text('Historique'), findsNothing);
     expect(find.text('Année'), findsNothing);
 
+    // Switch to TV Series mode
+    await tester.tap(find.text('Séries TV'));
+    await tester.pumpAndSettle();
+    expect(find.text('Identifier la série (AlloCiné / TVMaze)'), findsOneWidget);
+
     // Typing reveals "Nouvelle recherche" and tapping resets to zero
-    await tester.enterText(find.byType(TextField).first, 'Inception');
+    await tester.enterText(find.byType(TextField).first, 'Severance');
     await tester.pumpAndSettle();
     expect(find.text('Nouvelle recherche'), findsOneWidget);
 
     await tester.tap(find.text('Nouvelle recherche'));
     await tester.pumpAndSettle();
-    expect(find.text('Inception'), findsNothing);
+    expect(find.text('Severance'), findsNothing);
   });
 
   testWidgets('CountryFlag renders vector flags for FR, EN, ES, MULTI without errors',
