@@ -84,7 +84,30 @@ jobs:
           flutter create --platforms=windows --org com.safetorrent --project-name safetorrent .
           flutter pub get
           flutter build windows --release
-          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath SafeTorrent-Windows-Portable.zip
+
+          # Bundle official Microsoft VC++ CRT DLLs (app-local) so Windows PCs without
+          # Visual C++ Redistributable never hit "msvcp140.dll introuvable".
+          $releaseDir = "build\windows\x64\runner\Release"
+          $crtDir = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\*\*\VC\Redist\MSVC\*\x64\Microsoft.VC*.CRT" -Directory -ErrorAction SilentlyContinue |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if ($crtDir) {
+            Write-Host "Bundling VC++ CRT DLLs from $($crtDir.FullName)"
+            Copy-Item "$($crtDir.FullName)\*.dll" -Destination $releaseDir -Force
+          } else {
+            foreach ($dll in @("msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll", "vcruntime140.dll", "vcruntime140_1.dll")) {
+              $src = "C:\Windows\System32\$dll"
+              if (Test-Path $src) {
+                Copy-Item $src -Destination $releaseDir -Force
+              }
+            }
+          }
+          foreach ($req in @("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")) {
+            if (-not (Test-Path "$releaseDir\$req")) {
+              throw "Missing required VC++ runtime DLL: $req"
+            }
+          }
+
+          Compress-Archive -Path "$releaseDir\*" -DestinationPath SafeTorrent-Windows-Portable.zip
 
       - name: Package single-file Windows Setup EXE (Inno Setup)
         shell: pwsh
@@ -127,7 +150,7 @@ jobs:
           flutter build linux --release
           tar -czf SafeTorrent-Linux-x64.tar.gz -C build/linux/x64/release/bundle .
           chmod +x installer/build_deb.sh
-          bash installer/build_deb.sh 1.0.0
+          bash installer/build_deb.sh 1.0.1
 
       - name: Upload Linux DEB & tar.gz artifacts
         uses: actions/upload-artifact@v4
