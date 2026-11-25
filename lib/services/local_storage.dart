@@ -4,12 +4,13 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:safetorrent/models/app_settings.dart';
 import 'package:safetorrent/models/seedr_models.dart';
+import 'package:safetorrent/models/torbox_models.dart';
 import 'package:safetorrent/models/watchlist_item.dart';
 
 /// 100% on-device local persistence (Android, Windows, Linux — zero server/cloud).
 ///
-/// Stores user settings, the "Plus tard" watchlist, and optional Seedr OAuth tokens
-/// (never stores passwords).
+/// Stores user settings, the "Plus tard" watchlist, optional Seedr OAuth tokens,
+/// and optional named TorBox profiles (API keys stored locally only).
 class LocalStorageService {
   LocalStorageService({Directory? overrideDirectory})
       : _overrideDirectory = overrideDirectory;
@@ -19,7 +20,19 @@ class LocalStorageService {
   AppSettings settings = const AppSettings();
   List<WatchlistItem> watchlist = [];
   SeedrSession? seedrSession;
+  List<TorboxProfile> torboxProfiles = [];
+  String? activeTorboxProfileId;
   bool isLoaded = false;
+
+  TorboxProfile? get activeTorboxProfile {
+    if (torboxProfiles.isEmpty) return null;
+    if (activeTorboxProfileId != null) {
+      for (final p in torboxProfiles) {
+        if (p.id == activeTorboxProfileId) return p;
+      }
+    }
+    return torboxProfiles.first;
+  }
 
   Future<File> _storageFile() async {
     final dir = _overrideDirectory ?? await getApplicationSupportDirectory();
@@ -50,6 +63,18 @@ class LocalStorageService {
         final s = SeedrSession.fromJson(decoded['seedrSession'] as Map<String, dynamic>);
         seedrSession = s.isValid ? s : null;
       }
+      if (decoded['torboxProfiles'] is List) {
+        torboxProfiles = (decoded['torboxProfiles'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map(TorboxProfile.fromJson)
+            .where((p) => p.apiKey.trim().isNotEmpty)
+            .toList();
+      }
+      activeTorboxProfileId = decoded['activeTorboxProfileId'] as String?;
+      if (torboxProfiles.isNotEmpty &&
+          !torboxProfiles.any((p) => p.id == activeTorboxProfileId)) {
+        activeTorboxProfileId = torboxProfiles.first.id;
+      }
     } catch (_) {
       // Fall back cleanly to defaults if file is empty or unreadable
     } finally {
@@ -63,6 +88,8 @@ class LocalStorageService {
       'settings': settings.toJson(),
       'watchlist': watchlist.map((e) => e.toJson()).toList(),
       'seedrSession': seedrSession?.toJson(),
+      'torboxProfiles': torboxProfiles.map((e) => e.toJson()).toList(),
+      'activeTorboxProfileId': activeTorboxProfileId,
     };
     final tmp = File('${file.path}.tmp');
     await tmp.writeAsString(jsonEncode(payload));
@@ -76,6 +103,34 @@ class LocalStorageService {
 
   Future<void> setSeedrSession(SeedrSession? session) async {
     seedrSession = (session != null && session.isValid) ? session : null;
+    await _save();
+  }
+
+  Future<void> addOrUpdateTorboxProfile(TorboxProfile profile, {bool makeActive = true}) async {
+    final idx = torboxProfiles.indexWhere((p) => p.id == profile.id);
+    if (idx == -1) {
+      torboxProfiles.add(profile);
+    } else {
+      torboxProfiles[idx] = profile;
+    }
+    if (makeActive || activeTorboxProfileId == null) {
+      activeTorboxProfileId = profile.id;
+    }
+    await _save();
+  }
+
+  Future<void> setActiveTorboxProfile(String profileId) async {
+    if (torboxProfiles.any((p) => p.id == profileId)) {
+      activeTorboxProfileId = profileId;
+      await _save();
+    }
+  }
+
+  Future<void> deleteTorboxProfile(String profileId) async {
+    torboxProfiles.removeWhere((p) => p.id == profileId);
+    if (activeTorboxProfileId == profileId) {
+      activeTorboxProfileId = torboxProfiles.isNotEmpty ? torboxProfiles.first.id : null;
+    }
     await _save();
   }
 

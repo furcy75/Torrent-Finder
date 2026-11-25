@@ -27,6 +27,7 @@ void main() {
     expect(find.text('Rechercher'), findsOneWidget);
     expect(find.text('Plus tard'), findsOneWidget);
     expect(find.text('Seedr'), findsOneWidget);
+    expect(find.text('TorBox'), findsOneWidget);
 
     // History and year field are removed
     expect(find.text('Historique'), findsNothing);
@@ -37,6 +38,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Code Appareil (Recommandé)'), findsOneWidget);
     expect(find.text('Email & Mot de passe'), findsOneWidget);
+
+    // Switch to TorBox tab and verify onboarding
+    await tester.tap(find.text('TorBox'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ajouter un profil TorBox'), findsOneWidget);
 
     // Return to Search tab
     await tester.tap(find.text('Rechercher'));

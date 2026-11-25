@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:safetorrent/models/app_settings.dart';
+import 'package:safetorrent/models/torbox_models.dart';
 import 'package:safetorrent/services/local_storage.dart';
+import 'package:safetorrent/services/torbox_service.dart';
 
 class SettingsDialog extends StatefulWidget {
   const SettingsDialog({super.key, required this.storage});
@@ -13,9 +15,16 @@ class SettingsDialog extends StatefulWidget {
 
 class _SettingsDialogState extends State<SettingsDialog> {
   late AppSettings _draft;
+  late final TorboxService _torbox = TorboxService(storage: widget.storage);
+
   final _tzNameCtrl = TextEditingController();
   final _tzUrlCtrl = TextEditingController();
   final _tzKeyCtrl = TextEditingController();
+
+  final _tbLabelCtrl = TextEditingController();
+  final _tbKeyCtrl = TextEditingController();
+  bool _addingTorbox = false;
+  String? _torboxMsg;
 
   @override
   void initState() {
@@ -28,6 +37,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
     _tzNameCtrl.dispose();
     _tzUrlCtrl.dispose();
     _tzKeyCtrl.dispose();
+    _tbLabelCtrl.dispose();
+    _tbKeyCtrl.dispose();
     super.dispose();
   }
 
@@ -55,13 +66,44 @@ class _SettingsDialogState extends State<SettingsDialog> {
     });
   }
 
+  Future<void> _addTorboxProfile() async {
+    final key = _tbKeyCtrl.text.trim();
+    if (key.isEmpty) return;
+    setState(() {
+      _addingTorbox = true;
+      _torboxMsg = null;
+    });
+    try {
+      final p = await _torbox.addProfile(
+        label: _tbLabelCtrl.text,
+        apiKey: key,
+        makeActive: true,
+      );
+      if (!mounted) return;
+      setState(() {
+        _addingTorbox = false;
+        _tbLabelCtrl.clear();
+        _tbKeyCtrl.clear();
+        _torboxMsg = '✅ Profil « ${p.label} » ajouté (${p.planLabel}).';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _addingTorbox = false;
+        _torboxMsg = '⛔ $e';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final tbProfiles = widget.storage.torboxProfiles;
+
     return AlertDialog(
       backgroundColor: const Color(0xFF111C33),
-      title: const Text('⚙️ Réglages sécurité & sources'),
+      title: const Text('⚙️ Réglages sécurité, Cloud & sources'),
       content: SizedBox(
-        width: 540,
+        width: 560,
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -82,6 +124,84 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 title: const Text('Bloquer les archives (.zip, .rar, .7z)'),
                 subtitle: const Text('Protège contre les faux fichiers piégés par mot de passe'),
               ),
+              const Divider(),
+              const Text(
+                '⚡ Profils TorBox (clés API locales)',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              if (tbProfiles.isEmpty)
+                const Text(
+                  'Aucun profil TorBox configuré.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                )
+              else
+                ...tbProfiles.map(
+                  (p) => ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      p.isPremium ? Icons.workspace_premium : Icons.person_outline,
+                      color: p.isPremium ? const Color(0xFFFBBF24) : const Color(0xFF94A3B8),
+                    ),
+                    title: Text('${p.label} — ${p.planLabel}'),
+                    subtitle: Text(
+                      p.isPremium
+                          ? 'Sans limite${p.email != null ? ' • ${p.email}' : ''}'
+                          : (p.isInCooldown()
+                              ? '⏳ Cooldown : ${TorboxProfile.formatDuration(p.remainingCooldown())}'
+                              : 'Disponible${p.email != null ? ' • ${p.email}' : ''}'),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () async {
+                        await widget.storage.deleteTorboxProfile(p.id);
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _tbLabelCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Profil (ex : Moi, Sœur)',
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: _tbKeyCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Clé API TorBox',
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  OutlinedButton(
+                    onPressed: _addingTorbox ? null : _addTorboxProfile,
+                    child: _addingTorbox
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Ajouter'),
+                  ),
+                ],
+              ),
+              if (_torboxMsg != null) ...[
+                const SizedBox(height: 6),
+                Text(_torboxMsg!, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+              ],
               const Divider(),
               const Text(
                 '🔎 10 sources intégrées (sans pub / sans navigateur JS)',

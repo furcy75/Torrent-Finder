@@ -1,7 +1,7 @@
 name: safetorrent
 description: "Application 100% autonome (Android APK, Windows, Linux) avec bac à sable anti-virus et intégration Seedr pour films et séries."
 publish_to: 'none'
-version: 1.5.0+7
+version: 1.6.0+8
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

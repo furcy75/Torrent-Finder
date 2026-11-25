@@ -66,6 +66,11 @@ Récupérez directement la dernière version prête à l'emploi depuis [**GitHub
 - **Envoi en 1 clic** depuis les résultats de recherche ou depuis la modale **Bac à sable** (upload direct du fichier `.torrent` vérifié et assaini).
 - **Gestion en direct du compte** dans l'onglet **Seedr** : jauge de quota utilisé/libre, suivi auto-actualisé des transferts en cours, explorateur de dossiers/fichiers, téléchargement direct HTTPS, archive `.zip` de dossier, copie du lien direct (VLC) et suppression en un clic.
 
+### ⚡ Intégration TorBox en direct (optionnelle, multi-profils)
+- **Gestion de plusieurs profils familiaux** dans **⚙️ Réglages** ou l'onglet **TorBox** (chacun avec sa propre clé API officielle `torbox.app/settings` stockée localement).
+- **Statut officiel en direct** (`/v1/api/user/me`) : badge **⭐ Premium** (*Essential / Standard / Pro — sans limite*) ou **Gratuit** avec affichage du compte à rebours officiel si un compte gratuit est en cooldown.
+- **Envoi en 1 clic** (Magnet ou `.torrent` assaini par le bac à sable) + gestion en direct (`/torrents/mylist`, téléchargement HTTPS `/torrents/requestdl`, ZIP, pause/reprise et suppression).
+
 ### 📌 Liste « Plus tard » (sans historique superflu)
 - Aucun historique de navigation inutile n'est enregistré.
 - Sauvegardez en un clic les films non trouvés ou les séries en attente d'une nouvelle saison dans **Plus tard** : leur **vignette**, leurs titres multilingues et la **date de sortie de la saison suivante** sont conservés (avec bouton **Actualiser date**).

@@ -8,6 +8,7 @@ import 'package:safetorrent/services/indexers_service.dart';
 import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/services/release_parser.dart';
 import 'package:safetorrent/services/seedr_service.dart';
+import 'package:safetorrent/services/torbox_service.dart';
 import 'package:safetorrent/ui/home_shell.dart';
 import 'package:safetorrent/ui/nfo_dialog.dart';
 import 'package:safetorrent/ui/sandbox_dialog.dart';
@@ -25,6 +26,7 @@ class SearchScreen extends StatefulWidget {
     required this.triggerId,
     required this.onDataChanged,
     this.onOpenSeedr,
+    this.onOpenTorbox,
   });
 
   final LocalStorageService storage;
@@ -32,6 +34,7 @@ class SearchScreen extends StatefulWidget {
   final int triggerId;
   final VoidCallback onDataChanged;
   final VoidCallback? onOpenSeedr;
+  final VoidCallback? onOpenTorbox;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -470,8 +473,39 @@ class _SearchScreenState extends State<SearchScreen> {
         settings: widget.storage.settings,
         storage: widget.storage,
         onSentToSeedr: widget.onOpenSeedr,
+        onSentToTorbox: widget.onOpenTorbox,
       ),
     );
+  }
+
+  Future<void> _sendToTorbox(TorrentResult item) async {
+    final torbox = TorboxService(storage: widget.storage);
+    final active = torbox.activeProfile;
+    if (active == null) {
+      _showSnack('Ajoutez un profil dans l\'onglet TorBox (ou Réglages) pour envoyer des torrents.');
+      widget.onOpenTorbox?.call();
+      return;
+    }
+    final magnet = item.magnetUrl;
+    if (magnet == null || magnet.isEmpty) {
+      _showSnack('Utilisez « Bac à sable (.torrent) » pour envoyer ce fichier vers TorBox.');
+      return;
+    }
+    try {
+      _showSnack('Envoi vers TorBox (${active.label})...');
+      final msg = await torbox.addMagnet(active, magnet);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('⚡ Envoyé vers TorBox (${active.label}) : $msg'),
+          action: widget.onOpenTorbox != null
+              ? SnackBarAction(label: 'Ouvrir TorBox', onPressed: widget.onOpenTorbox!)
+              : null,
+        ),
+      );
+    } catch (e) {
+      _showSnack('$e');
+    }
   }
 
   Future<void> _sendToSeedr(TorrentResult item) async {
@@ -1500,12 +1534,22 @@ class _SearchScreenState extends State<SearchScreen> {
                     icon: const Icon(Icons.verified_user_outlined, size: 18),
                     label: const Text('Bac à sable (.torrent)'),
                   ),
-                if (item.magnetUrl != null)
+                if (item.magnetUrl != null) ...[
                   OutlinedButton.icon(
                     onPressed: isBlocked ? null : () => _sendToSeedr(item),
                     icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-                    label: const Text('Envoyer vers Seedr'),
+                    label: const Text('Seedr'),
                   ),
+                  OutlinedButton.icon(
+                    onPressed: isBlocked ? null : () => _sendToTorbox(item),
+                    icon: const Icon(Icons.bolt_outlined, size: 18),
+                    label: Text(
+                      widget.storage.activeTorboxProfile != null
+                          ? 'TorBox (${widget.storage.activeTorboxProfile!.label})'
+                          : 'TorBox',
+                    ),
+                  ),
+                ],
                 OutlinedButton.icon(
                   onPressed: () => _openNfo(item),
                   icon: const Icon(Icons.description_outlined, size: 18),

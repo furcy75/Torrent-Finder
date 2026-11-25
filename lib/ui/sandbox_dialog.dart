@@ -10,6 +10,7 @@ import 'package:safetorrent/sandbox/sandbox_worker.dart';
 import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/services/release_parser.dart';
 import 'package:safetorrent/services/seedr_service.dart';
+import 'package:safetorrent/services/torbox_service.dart';
 import 'package:share_plus/share_plus.dart';
 
 class SandboxDialog extends StatefulWidget {
@@ -19,12 +20,14 @@ class SandboxDialog extends StatefulWidget {
     required this.settings,
     this.storage,
     this.onSentToSeedr,
+    this.onSentToTorbox,
   });
 
   final TorrentResult torrent;
   final AppSettings settings;
   final LocalStorageService? storage;
   final VoidCallback? onSentToSeedr;
+  final VoidCallback? onSentToTorbox;
 
   @override
   State<SandboxDialog> createState() => _SandboxDialogState();
@@ -34,6 +37,7 @@ class _SandboxDialogState extends State<SandboxDialog> {
   SandboxExecutionResult? _result;
   bool _saving = false;
   bool _sendingSeedr = false;
+  bool _sendingTorbox = false;
   String? _savedMessage;
 
   @override
@@ -122,11 +126,31 @@ class _SandboxDialogState extends State<SandboxDialog> {
     }
   }
 
+  Future<void> _sendSanitizedToTorbox(Uint8List bytes, String rawName) async {
+    final storage = widget.storage;
+    final active = storage?.activeTorboxProfile;
+    if (storage == null || active == null) return;
+    setState(() => _sendingTorbox = true);
+    try {
+      final torbox = TorboxService(storage: storage);
+      final msg = await torbox.addTorrentBytes(active, bytes, _safeFileName(rawName));
+      if (!mounted) return;
+      setState(() => _savedMessage = '⚡ Envoyé sur TorBox (${active.label}) : $msg');
+      widget.onSentToTorbox?.call();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _savedMessage = 'Erreur TorBox : $e');
+    } finally {
+      if (mounted) setState(() => _sendingTorbox = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final res = _result;
     final report = res?.report;
     final seedrReady = widget.storage?.seedrSession?.isValid == true;
+    final activeTorbox = widget.storage?.activeTorboxProfile;
 
     return AlertDialog(
       backgroundColor: const Color(0xFF111C33),
@@ -279,6 +303,20 @@ class _SandboxDialogState extends State<SandboxDialog> {
                     )
                   : const Icon(Icons.cloud_upload_outlined, size: 17),
               label: const Text('Envoyer vers Seedr'),
+            ),
+          if (activeTorbox != null)
+            OutlinedButton.icon(
+              onPressed: _sendingTorbox
+                  ? null
+                  : () => _sendSanitizedToTorbox(res!.sanitizedBytes!, widget.torrent.title),
+              icon: _sendingTorbox
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.bolt_outlined, size: 17),
+              label: Text('TorBox (${activeTorbox.label})'),
             ),
           FilledButton.icon(
             onPressed: _saving
