@@ -232,6 +232,7 @@ class _HomeShellState extends State<HomeShell> {
   // Donate / GitHub Sponsors Dialog
   // -------------------------------------------------------------------
   Future<void> _openDonateDialog() async {
+    final messenger = ScaffoldMessenger.of(context);
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -258,9 +259,9 @@ class _HomeShellState extends State<HomeShell> {
               Navigator.of(ctx).pop();
               final uri = Uri.parse(HomeShell.sponsorUrl);
               final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-              if (!ok && mounted) {
+              if (!ok) {
                 await Clipboard.setData(const ClipboardData(text: HomeShell.sponsorUrl));
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   const SnackBar(
                     content: Text('Lien GitHub Sponsors copié dans le presse-papiers.'),
                   ),
