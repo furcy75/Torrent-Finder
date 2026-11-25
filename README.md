@@ -4,153 +4,125 @@
 
 # Torrent Seeder
 
-**Moteur de recherche Torrent autonome pour Films & Séries TV avec bac à sable anti-virus et intégration Seedr.cc multi-comptes**
+**Standalone Movie & TV Series Torrent Search Engine with Built-in Anti-Malware Sandbox & Multi-Account Seedr.cc Integration**
 
-*100 % autonome sur Android, Windows et Linux — Zéro serveur, zéro publicité, zéro navigateur piégé.*
+*100% standalone on Android, Windows, and Linux — Zero server, zero ads, zero trapped browsers, 6-language UI.*
 
-**🇫🇷 Français** | [🇬🇧 English](README.en.md) | [🇪🇸 Español](README.es.md)
+**🇬🇧 English** | [🇫🇷 Français](README.fr.md) | [🇪🇸 Español](README.es.md) | [🇩🇪 Deutsch](README.de.md) | [🇳🇱 Nederlands](README.nl.md) | [🇮🇹 Italiano](README.it.md)
 
 [![Build & Release](https://github.com/furcy75/Torrent-Finder/actions/workflows/build-release.yml/badge.svg)](https://github.com/furcy75/Torrent-Finder/actions/workflows/build-release.yml)
 [![Latest Release](https://img.shields.io/github/v/release/furcy75/Torrent-Finder?color=22c55e&label=Version)](https://github.com/furcy75/Torrent-Finder/releases/latest)
-[![Platforms](https://img.shields.io/badge/Plateformes-Android%20%7C%20Windows%20%7C%20Linux-38bdf8)](#téléchargement)
-[![GitHub Sponsors](https://img.shields.io/badge/Soutenir-GitHub%20Sponsors-db2777?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/furcy75)
-[![License: MIT](https://img.shields.io/badge/Licence-MIT-94a3b8.svg)](LICENSE)
+[![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20Windows%20%7C%20Linux-38bdf8)](#download)
+[![GitHub Sponsors](https://img.shields.io/badge/Support-GitHub%20Sponsors-db2777?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/furcy75)
+[![License: MIT](https://img.shields.io/badge/License-MIT-94a3b8.svg)](LICENSE)
 
 </div>
 
 ---
 
-## 🎯 Pourquoi Torrent Seeder ?
+## 🎯 Why Torrent Seeder?
 
-Chercher un fichier `.torrent` sur le web expose habituellement à deux menaces majeures : les **pages web publicitaires piégées** (popups, faux boutons « Download », scripts malveillants) et les **faux torrents** contenant des exécutables déguisés (`Film.mkv.exe`, raccourcis `.lnk`, archives `.rar` piégées).
+Searching for `.torrent` files on the web typically exposes users to two major risks: **malicious ad-filled web pages** (popups, fake "Download" buttons, drive-by scripts) and **fake torrents** hiding executables (`Movie.mkv.exe`, `.lnk` shortcuts, password-protected `.rar` traps).
 
-**Torrent Seeder** élimine ces deux risques grâce à une architecture **100 % locale et autonome** :
+**Torrent Seeder** eliminates both threats with a **100% local, standalone architecture**:
 
-- **Aucun serveur requis** : l'APK Android tourne en totale autonomie sur votre téléphone, tout comme l'application Windows et Linux.
-- **Aucune WebView / aucun navigateur** : les recherches s'effectuent exclusivement via des requêtes HTTP brutes (APIs JSON / RSS XML / métadonnées).
-- **Bac à sable intégré** : chaque `.torrent` est téléchargé en mémoire dans un **Isolate Dart séparé**, inspecté fichier par fichier, puis **reconstruit à neuf** sans métadonnées externes avant d'être enregistré ou envoyé vers Seedr.
+- **No server required**: the Android APK runs completely solo on your phone, just like the Windows and Linux apps.
+- **No WebView / no browser engine**: searches use raw HTTP requests only (JSON APIs / RSS XML / metadata).
+- **Built-in Anti-Malware Sandbox**: every `.torrent` file is downloaded in memory inside an **isolated Dart Isolate**, inspected file-by-file, and **rebuilt cleanly** without external metadata before saving or sending to Seedr.
+- **Instant 6-Language UI**: switch live between **English, Français, Español, Deutsch, Nederlands, and Italiano** via the flag icon next to Settings.
 
 ---
 
-## 📦 Téléchargement
+## 📦 Download
 
-Récupérez directement la dernière version prête à l'emploi depuis [**GitHub Releases**](https://github.com/furcy75/Torrent-Finder/releases/latest) :
+Grab the latest ready-to-use binaries from [**GitHub Releases**](https://github.com/furcy75/Torrent-Finder/releases/latest):
 
-| Plateforme | Fichier | Installation |
+| Platform | File | Installation |
 | :--- | :--- | :--- |
-| **Android** *(autonome)* | [`TorrentSeeder-Android.apk`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/TorrentSeeder-Android.apk) | Installer l'APK directement sur le téléphone |
-| **Windows** *(Installateur)* | [`TorrentSeeder-Windows-Setup.exe`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/TorrentSeeder-Windows-Setup.exe) | Double-clic (DLLs Visual C++ incluses, zéro prérequis) |
-| **Windows** *(Portable)* | [`TorrentSeeder-Windows-Portable.zip`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/TorrentSeeder-Windows-Portable.zip) | Décompresser et lancer `safetorrent.exe` |
+| **Android** *(standalone)* | [`TorrentSeeder-Android.apk`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/TorrentSeeder-Android.apk) | Install the APK directly on your device |
+| **Windows** *(Installer)* | [`TorrentSeeder-Windows-Setup.exe`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/TorrentSeeder-Windows-Setup.exe) | Double-click (Visual C++ DLLs bundled, zero prerequisites) |
+| **Windows** *(Portable)* | [`TorrentSeeder-Windows-Portable.zip`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/TorrentSeeder-Windows-Portable.zip) | Extract and launch `safetorrent.exe` |
 | **Linux** *(Ubuntu / Debian / Mint)* | [`TorrentSeeder-Linux-amd64.deb`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/TorrentSeeder-Linux-amd64.deb) | `sudo apt install ./TorrentSeeder-Linux-amd64.deb` |
-| **Linux** *(Portable)* | [`TorrentSeeder-Linux-x64.tar.gz`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/TorrentSeeder-Linux-x64.tar.gz) | Décompresser et lancer `./safetorrent` |
+| **Linux** *(Portable)* | [`TorrentSeeder-Linux-x64.tar.gz`](https://github.com/furcy75/Torrent-Finder/releases/latest/download/TorrentSeeder-Linux-x64.tar.gz) | Extract and run `./safetorrent` |
 
 ---
 
-## ✨ Fonctionnalités principales
+## ✨ Key Features
 
-### 🎬 Parcours guidé Films & Séries TV
-1. **Saisie ultra-simple** : choisissez **Films** ou **Séries TV** et tapez uniquement le titre.
-2. **Identification multilingue** : recherche simultanée sur **AlloCiné**, **Wikidata (FR / EN / ES)**, **TVMaze** et **IMDb** affichant la **vignette (affiche)** et les titres dans chaque langue avec de **vrais drapeaux vectoriels en couleur**.
-3. **Suivi des Séries TV** : affichage du **nombre de saisons**, du **statut** (*En cours*, *Terminée*...), de la **date de sortie de la prochaine saison ou du prochain épisode**, et d'un sélecteur rapide par saison (`S01`, `S02`..., `Intégrale`).
-4. **Nouvelle recherche** en un clic pour repartir à zéro.
+### 🎬 Guided Movie & TV Series Workflow
+1. **Clean Title Input**: toggle **Movies** or **TV Series** and enter only the title.
+2. **Multilingual Matching**: simultaneously queries **AlloCiné**, **Wikidata**, **TVMaze**, and **IMDb**, displaying the **poster thumbnail** and localized titles with **vector country flags**.
+3. **TV Series Tracking**: displays **season count**, **status**, **next season / next episode release date**, and a quick season selector (`S01`, `S02`..., `Complete`).
+4. **One-Click Reset** to start a fresh search from scratch.
 
-### 🏷️ Filtres rapides par catégories & Détails NFO
-- **Filtres organisés en lignes** :
-  - **Langues** : Français, English, Español, MULTI *(avec drapeaux vectoriels)*
-  - **Disponibilité** : `▲ Seeders actifs`, `🔥 ≥ 10 seeders`
-  - **Taille max** : `< 2 Go`, `< 5 Go`, `< 10 Go`
-  - **Résolution** : `4K`, `1080p`, `720p`
-  - **Source & Codec** : `BluRay`, `WEB-DL`, `WEBRip`, `HDRip`, `H.264 / x264`, `x265`, `HDR`
-  - **Qualité** : `🚫 Sans CAM/TS` *(activé par défaut)*
-- **Visionneuse NFO / Détails sécurisée** : consulte le NFO/MediaInfo en texte brut monospace sans jamais rendre de HTML ou JavaScript.
+### 🏷️ Categorized Quick Filters & Secure NFO Viewer
+- **Row-grouped quick filters**:
+  - **Languages**: French, English, Spanish, German, Dutch, Italian, MULTI *(with vector flags)*
+  - **Availability**: `▲ Active seeders`, `🔥 ≥ 10 seeders`
+  - **Max size**: `< 2 GB`, `< 5 GB`, `< 10 GB`
+  - **Resolution**: `4K`, `1080p`, `720p`
+  - **Source & Codec**: `BluRay`, `WEB-DL`, `WEBRip`, `HDRip`, `H.264 / x264`, `x265`, `HDR`
+  - **Quality**: `🚫 Exclude CAM/TS` *(enabled by default)*
+- **Plain-text NFO / Details Viewer**: displays NFO/MediaInfo safely in monospace text with zero HTML/JS execution.
 
-### ☁️ Intégration Seedr.cc en direct (multi-comptes & suivi discret)
-- **Gestion de plusieurs comptes Seedr** : connectez autant de comptes nommés que souhaité via **Code Appareil** (`seedr.cc/devices`, renouvellement automatique sans mot de passe) ou **Email & Mot de passe** (seul le jeton OAuth est conservé localement, jamais votre mot de passe).
-- **Sélecteur manuel avec quota & statut en direct** : lors de l'envoi d'un Magnet ou d'un `.torrent` assaini par le bac à sable, **Torrent Seeder** vérifie en direct l'espace libre de chaque compte et indique si un **téléchargement est déjà en cours**, puis vous laisse **sélectionner manuellement** le compte cible.
-- **Notification discrète de fin de téléchargement** : un pop-up sobre (**« Fichier téléchargé »**, sans afficher le nom ni le détail du fichier) vous prévient automatiquement dès qu'un transfert Seedr se termine.
-- **Gestion complète en direct** dans l'onglet **Seedr** : bascule entre comptes, jauge de quota, suivi auto-actualisé des transferts, explorateur de dossiers/fichiers, téléchargement direct HTTPS, archive `.zip` de dossier, copie du lien direct (VLC) et suppression en un clic.
+### ☁️ Live Seedr.cc Integration (Multi-Account & Discreet Alerts)
+- **Multiple Seedr Accounts**: connect multiple named accounts via **Device Code OAuth** (`seedr.cc/devices`, auto-refreshing with zero password stored) or **Email & Password** (only the OAuth token is saved locally — passwords are never stored).
+- **Quota & Active Transfer Picker**: before sending a Magnet link or sanitized `.torrent` file, **Torrent Seeder** checks each account's live free space and indicates whether a **download is currently in progress**, letting you **manually choose** which account to use.
+- **Discreet Download Complete Popup**: displays a clean privacy-friendly alert (**"File downloaded"**, without revealing any filename or details) as soon as a Seedr transfer finishes.
+- **Live Account Management**: switch accounts, view storage quota, monitor active transfers, browse folders/files, open direct HTTPS downloads, download folder ZIPs, copy direct URLs (VLC), and delete items in one tap.
 
-### 📌 Liste « Plus tard » (sans historique superflu)
-- Aucun historique de navigation inutile n'est enregistré.
-- Sauvegardez en un clic les films non trouvés ou les séries en attente d'une nouvelle saison dans **Plus tard** : leur **vignette**, leurs titres multilingues et la **date de sortie de la saison suivante** sont conservés (avec bouton **Actualiser date**).
+### 📌 Watchlist (No Cluttered History)
+- No unnecessary search history is stored.
+- Save unfound movies or upcoming TV series with their **poster**, multilingual titles, and **next season release date** (with a one-click date refresh button).
 
 ---
 
-## 🛡️ Architecture du Bac à Sable
+## 🛡️ Sandbox Architecture
 
 ```mermaid
 flowchart LR
-    U["Recherche Film / Série"] --> I["10 Sources HTTP brutes<br/>(JSON / RSS, zéro JS)"]
-    I --> R["Résultats dédupliqués<br/>+ Pré-scan statique"]
-    R --> W["Dart Isolate isolé<br/>(RAM max 2 Mo, Anti-SSRF)"]
-    W --> B["Décodeur Bencode strict<br/>(Anti-bombes prof. 32)"]
-    B --> S["Inspecteur Anti-Malware<br/>(Bloque .exe/.lnk/.bat/RTLO/../.rar)"]
-    S -->|Menace détectée| X["⛔ Bloqué + Rapport détaillé"]
-    S -->|100% Vidéo/Sous-titres| C["Reconstructeur .torrent propre<br/>(SHA-1 info_hash préservé)"]
-    C --> D["✅ Export .torrent ou envoi Seedr"]
+    U["Movie / Series Search"] --> I["10 Raw HTTP Indexers<br/>(JSON / RSS, zero JS)"]
+    I --> R["Deduplicated Results<br/>+ Static Pre-Scan"]
+    R --> W["Isolated Dart Isolate<br/>(2 MiB cap, Anti-SSRF)"]
+    W --> B["Strict Bencode Decoder<br/>(Max depth 32)"]
+    B --> S["Anti-Malware Inspector<br/>(Blocks .exe/.lnk/.bat/RTLO/../.rar)"]
+    S -->|Threat detected| X["⛔ Blocked + Detailed Report"]
+    S -->|100% Video/Subtitles| C["Clean .torrent Rebuilder<br/>(Bit-exact SHA-1 info_hash)"]
+    C --> D["✅ Safe .torrent Export or Seedr Upload"]
 ```
 
-### Protections actives dans le bac à sable
-| Menace | Protection implémentée |
-| :--- | :--- |
-| **Malvertising, popups, drive-by downloads** | Zéro WebView, zéro navigateur, zéro exécution JavaScript |
-| **Exécutables & scripts cachés** | Blocage strict : `.exe`, `.msi`, `.bat`, `.cmd`, `.scr`, `.lnk`, `.vbs`, `.ps1`, `.js`, `.apk`, `.dmg`, `.iso`, doubles extensions `.mkv.exe` |
-| **Usurpation d'extension Unicode (RTLO)** | Détection et blocage des caractères bidirectionnels (`\u202e`, etc.) |
-| **Traversée de répertoire (`../`)** | Validation stricte de chaque segment de chemin (`..`, `/`, `\`, `C:`) |
-| **Faux films en archive piégée** | Blocage configurable des `.zip`, `.rar`, `.7z` et mode vidéo strict |
-| **Bombes Bencode / pages HTML déguisées** | Plafond strict `2 Mo`, profondeur max `32`, rejet immédiat `text/html` |
-| **Attaques SSRF** | Validation DNS + IP sur chaque requête et redirection (blocage `file://`, `127.0.0.1`, réseaux privés) |
-| **Métadonnées externes / trackers suspects** | Reconstruction d'un `.torrent` minimal (`announce`, `announce-list`, `info` brut bit-exact) |
+---
+
+## 🔎 Built-in Indexers (10 + Optional Torznab)
+
+All sources can be toggled individually in **⚙️ Settings**:
+**YTS**, **APIBay** (with NFO), **Knaben**, **TorrentCSV**, **SolidTorrents**, **EZTV**, **BitSearch**, **Nyaa**, **LimeTorrents**, **Internet Archive**, plus optional **Torznab** (**Jackett** & **Prowlarr**).
 
 ---
 
-## 🔎 Sources intégrées (10 + Torznab)
+## 💖 Support the Project
 
-Toutes les sources sont activables/désactivables individuellement dans **⚙️ Réglages** :
+**Torrent Seeder** is 100% free, open-source, and ad-free. If you enjoy using it, you can support ongoing development through [**GitHub Sponsors**](https://github.com/sponsors/furcy75) (also accessible via the dedicated donate icon inside the app).
 
-| Source | Protocole | Contenu | Spécificité |
-| :--- | :--- | :--- | :--- |
-| **YTS** | API JSON | Films HD / 4K | Liens `.torrent` directs + fiche technique |
-| **APIBay** | API JSON | Films & Séries | NFO / MediaInfo complet via `t.php` |
-| **Knaben** | API JSON | Films & Séries | Agrégateur multi-trackers (1337x, TGx, TPB, RuTracker...) |
-| **TorrentCSV** | API JSON | Films & Séries | Base open-source rapide |
-| **SolidTorrents** | API JSON | Films & Séries | Catalogue vidéo indexé par seeders |
-| **EZTV** | HTML brut | Séries TV | Spécialiste séries avec `.torrent` directs |
-| **BitSearch** | HTML brut | Films & Séries | Méta-index haute couverture |
-| **Nyaa** | RSS XML | Anime & Animation | Liens `.torrent` directs |
-| **LimeTorrents** | RSS XML | Films & Séries | Liens `.torrent` directs |
-| **Internet Archive** | API JSON | Classiques / Domaine public | `.torrent` et `.nfo` directs |
-| **Torznab *(optionnel)*** | XML standard | Vos propres trackers | Compatible **Jackett** & **Prowlarr** |
+[![Sponsor on GitHub](https://img.shields.io/badge/Donate-GitHub%20Sponsors-db2777?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/furcy75)
 
 ---
 
-## 💖 Soutenir le projet
+## 🛠️ Local Development & Build
 
-**Torrent Seeder** est gratuit, open-source et sans aucune publicité. Si ce logiciel vous est utile, vous pouvez soutenir son développement via [**GitHub Sponsors**](https://github.com/sponsors/furcy75) (également accessible depuis l'icône de don dédiée dans l'application).
-
-[![Sponsoriser sur GitHub](https://img.shields.io/badge/Faire%20un%20don-GitHub%20Sponsors-db2777?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/furcy75)
-
----
-
-## 🛠️ Développement & Compilation locale
-
-Prérequis : [Flutter 3.24+](https://docs.flutter.dev/get-started/install) (Dart 3.3+) et Python 3 + Pillow *(pour générer les icônes natives)*.
+Requirements: [Flutter 3.24+](https://docs.flutter.dev/get-started/install) (Dart 3.3+) and Python 3 + Pillow *(to generate platform icons)*.
 
 ```bash
-# 1. Cloner le dépôt
 git clone https://github.com/furcy75/Torrent-Finder.git
 cd Torrent-Finder
 
-# 2. Générer les runners plateformes & les icônes
 flutter create --platforms=android,windows,linux --org com.safetorrent --project-name safetorrent .
-python3 installer/generate_icons.py --platform android   # ou windows / linux
+python3 installer/generate_icons.py --platform android   # or windows / linux
 flutter pub get
 
-# 3. Lancer l'analyse statique et les tests sécurité/UI
 flutter analyze
 flutter test -r expanded
 
-# 4. Compiler au choix
 flutter build apk --release        # Android APK
 flutter build windows --release    # Windows x64
 flutter build linux --release      # Linux x64
@@ -158,8 +130,8 @@ flutter build linux --release      # Linux x64
 
 ---
 
-## ⚖️ Avertissement légal & Licence
+## ⚖️ Legal Notice & License
 
-Torrent Seeder est un outil technique de recherche et d'assainissement de métadonnées BitTorrent (`.torrent`). L'application n'héberge aucun contenu protégé. Chaque utilisateur est seul responsable de l'usage qu'il en fait et du respect de la législation sur le droit d'auteur en vigueur dans son pays.
+Torrent Seeder is a technical tool for searching and sanitizing BitTorrent metadata (`.torrent`). The application hosts no copyrighted material. Users are solely responsible for how they use this software and for complying with applicable copyright laws in their jurisdiction.
 
-Distribué sous licence **MIT** — voir [LICENSE](LICENSE).
+Licensed under the **MIT License** — see [LICENSE](LICENSE).

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:safetorrent/l10n/app_l10n.dart';
 import 'package:safetorrent/models/app_settings.dart';
 import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/services/release_parser.dart';
@@ -64,11 +65,12 @@ class _SettingsDialogState extends State<SettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final seedrAccounts = widget.storage.seedrAccounts;
 
     return AlertDialog(
       backgroundColor: const Color(0xFF111C33),
-      title: const Text('⚙️ Réglages sécurité, Seedr & sources'),
+      title: Text(l10n.t('settings_title')),
       content: SizedBox(
         width: 560,
         child: SingleChildScrollView(
@@ -76,28 +78,31 @@ class _SettingsDialogState extends State<SettingsDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('🛡️ Règles du Bac à Sable', style: TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                l10n.t('settings_sandbox_section'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.strictVideoOnly,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(strictVideoOnly: v)),
-                title: const Text('Mode vidéo strict'),
-                subtitle: const Text('Bloque tout torrent sans fichier vidéo (.mkv, .mp4...)'),
+                title: Text(l10n.t('settings_strict_video')),
+                subtitle: Text(l10n.t('settings_strict_video_sub')),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.blockArchives,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(blockArchives: v)),
-                title: const Text('Bloquer les archives (.zip, .rar, .7z)'),
-                subtitle: const Text('Protège contre les faux fichiers piégés par mot de passe'),
+                title: Text(l10n.t('settings_block_archives')),
+                subtitle: Text(l10n.t('settings_block_archives_sub')),
               ),
               const Divider(),
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      '☁️ Comptes Seedr',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                      l10n.t('settings_seedr_section'),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                   if (widget.onOpenSeedrTab != null)
@@ -107,16 +112,16 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         widget.onOpenSeedrTab!.call();
                       },
                       icon: const Icon(Icons.person_add_alt_1_outlined, size: 17),
-                      label: const Text('Gérer / Ajouter'),
+                      label: Text(l10n.t('settings_manage_add')),
                     ),
                 ],
               ),
               if (seedrAccounts.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 6),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
                   child: Text(
-                    'Aucun compte Seedr connecté. Ouvrez l\'onglet Seedr pour connecter un ou plusieurs comptes.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                    l10n.t('settings_no_seedr'),
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                   ),
                 )
               else
@@ -130,12 +135,12 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       [
                         if (acc.username != null && acc.username != acc.displayName) acc.username!,
                         if (acc.lastSpaceFree != null && acc.lastSpaceMax != null)
-                          'Libre : ${ReleaseParser.formatSize(acc.lastSpaceFree!)} / ${ReleaseParser.formatSize(acc.lastSpaceMax!)}',
+                          '${l10n.t('space_free', {'free': ReleaseParser.formatSize(acc.lastSpaceFree!)})} / ${ReleaseParser.formatSize(acc.lastSpaceMax!)}',
                       ].join(' • '),
                       style: const TextStyle(fontSize: 12),
                     ),
                     trailing: IconButton(
-                      tooltip: 'Supprimer ce compte',
+                      tooltip: l10n.t('delete'),
                       icon: const Icon(Icons.close, size: 18),
                       onPressed: () async {
                         await widget.storage.deleteSeedrAccount(acc.id);
@@ -145,74 +150,74 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   ),
                 ),
               const Divider(),
-              const Text(
-                '🔎 10 sources intégrées (sans pub / sans navigateur JS)',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              Text(
+                l10n.t('settings_sources_section'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.enableYts,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(enableYts: v)),
-                title: const Text('YTS (Films HD / 4K — .torrent directs)'),
+                title: const Text('YTS (HD / 4K Movies — direct .torrent)'),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.enableApibay,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(enableApibay: v)),
-                title: const Text('APIBay (Films & Séries — NFO détaillé)'),
+                title: const Text('APIBay (Movies & Series — full NFO)'),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.enableKnaben,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(enableKnaben: v)),
-                title: const Text('Knaben (Multi-trackers : 1337x, TGx, TPB, RuTracker...)'),
+                title: const Text('Knaben (Multi-trackers: 1337x, TGx, TPB, RuTracker...)'),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.enableTorrentCsv,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(enableTorrentCsv: v)),
-                title: const Text('TorrentCSV (Base open-source JSON)'),
+                title: const Text('TorrentCSV (Open-source JSON index)'),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.enableSolidTorrents,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(enableSolidTorrents: v)),
-                title: const Text('SolidTorrents (API JSON vidéo)'),
+                title: const Text('SolidTorrents (Video JSON API)'),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.enableEztv,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(enableEztv: v)),
-                title: const Text('EZTV (Spécialiste Séries TV — .torrent directs)'),
+                title: const Text('EZTV (TV Series — direct .torrent)'),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.enableBitSearch,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(enableBitSearch: v)),
-                title: const Text('BitSearch (Méta-index Films & Séries)'),
+                title: const Text('BitSearch (Movies & Series meta-index)'),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.enableNyaa,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(enableNyaa: v)),
-                title: const Text('Nyaa (RSS Anime & Animation — .torrent directs)'),
+                title: const Text('Nyaa (Anime & Animation RSS — direct .torrent)'),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.enableLimeTorrents,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(enableLimeTorrents: v)),
-                title: const Text('LimeTorrents (RSS Films & Séries — .torrent directs)'),
+                title: const Text('LimeTorrents (Movies & Series RSS — direct .torrent)'),
               ),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _draft.enableArchiveOrg,
                 onChanged: (v) => setState(() => _draft = _draft.copyWith(enableArchiveOrg: v)),
-                title: const Text('Internet Archive (Classiques & domaine public)'),
+                title: const Text('Internet Archive (Classics & public domain)'),
               ),
               const Divider(),
-              const Text(
-                '🔌 Torznab optionnel (Jackett / Prowlarr)',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              Text(
+                l10n.t('settings_torznab_section'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 6),
               ..._draft.torznabIndexers.map(
@@ -236,13 +241,18 @@ class _SettingsDialogState extends State<SettingsDialog> {
               ),
               TextField(
                 controller: _tzNameCtrl,
-                decoration: const InputDecoration(labelText: 'Nom (ex : Jackett FR)', isDense: true),
+                decoration: InputDecoration(
+                  labelText: l10n.t('settings_torznab_name'),
+                  isDense: true,
+                ),
               ),
               const SizedBox(height: 6),
               TextField(
                 controller: _tzUrlCtrl,
-                decoration:
-                    const InputDecoration(labelText: 'URL Torznab (http/https)', isDense: true),
+                decoration: InputDecoration(
+                  labelText: l10n.t('settings_torznab_url'),
+                  isDense: true,
+                ),
               ),
               const SizedBox(height: 6),
               Row(
@@ -250,11 +260,14 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   Expanded(
                     child: TextField(
                       controller: _tzKeyCtrl,
-                      decoration: const InputDecoration(labelText: 'Clé API', isDense: true),
+                      decoration: InputDecoration(
+                        labelText: l10n.t('settings_api_key'),
+                        isDense: true,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  OutlinedButton(onPressed: _addTorznab, child: const Text('Ajouter')),
+                  OutlinedButton(onPressed: _addTorznab, child: Text(l10n.t('add'))),
                 ],
               ),
             ],
@@ -264,14 +277,14 @@ class _SettingsDialogState extends State<SettingsDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
+          child: Text(l10n.t('cancel')),
         ),
         FilledButton(
           onPressed: () async {
             await widget.storage.updateSettings(_draft);
             if (context.mounted) Navigator.of(context).pop();
           },
-          child: const Text('Enregistrer'),
+          child: Text(l10n.t('save')),
         ),
       ],
     );

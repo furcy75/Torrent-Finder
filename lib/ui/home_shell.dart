@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:safetorrent/l10n/app_l10n.dart';
 import 'package:safetorrent/models/movie_suggestion.dart';
 import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/services/seedr_service.dart';
@@ -9,6 +10,7 @@ import 'package:safetorrent/ui/search_screen.dart';
 import 'package:safetorrent/ui/seedr_screen.dart';
 import 'package:safetorrent/ui/settings_dialog.dart';
 import 'package:safetorrent/ui/watchlist_screen.dart';
+import 'package:safetorrent/ui/widgets/country_flag.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class PendingSearchRequest {
@@ -22,11 +24,16 @@ class PendingSearchRequest {
 }
 
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, required this.storage});
+  const HomeShell({
+    super.key,
+    required this.storage,
+    this.onLanguageChanged,
+  });
 
   static const String sponsorUrl = 'https://github.com/sponsors/furcy75';
 
   final LocalStorageService storage;
+  final ValueChanged<String>? onLanguageChanged;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -66,8 +73,17 @@ class _HomeShellState extends State<HomeShell> {
   Future<void> _initStorage() async {
     await widget.storage.load();
     if (mounted) {
+      widget.onLanguageChanged?.call(widget.storage.settings.appLanguage);
       setState(() => _ready = true);
     }
+  }
+
+  Future<void> _selectLanguage(String code) async {
+    await widget.storage.updateSettings(
+      widget.storage.settings.copyWith(appLanguage: code),
+    );
+    widget.onLanguageChanged?.call(code);
+    if (mounted) setState(() {});
   }
 
   void _triggerSearch(PendingSearchRequest req) {
@@ -89,7 +105,7 @@ class _HomeShellState extends State<HomeShell> {
   // Global Discreet Download Completion Monitor (zero file details shown)
   // -------------------------------------------------------------------
   void _onSeedrTransferStarted(String accountId) {
-    _pendingNewTransferTicks[accountId] = 15; // Watch up to ~2 min for cached/new transfers
+    _pendingNewTransferTicks[accountId] = 15;
     _ensureCompletionPolling();
   }
 
@@ -191,25 +207,24 @@ class _HomeShellState extends State<HomeShell> {
   Future<void> _showDiscreetDownloadFinishedPopup() async {
     if (!mounted || _completionPopupOpen) return;
     _completionPopupOpen = true;
+    final l10n = AppL10n.of(context);
     try {
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: const Color(0xFF111C33),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.check_circle_outline, color: Color(0xFF22C55E), size: 28),
-              SizedBox(width: 10),
-              Expanded(child: Text('Fichier téléchargé')),
+              const Icon(Icons.check_circle_outline, color: Color(0xFF22C55E), size: 28),
+              const SizedBox(width: 10),
+              Expanded(child: Text(l10n.t('dl_done_title'))),
             ],
           ),
-          content: const Text(
-            'Votre téléchargement est terminé et disponible dans votre espace Seedr.',
-          ),
+          content: Text(l10n.t('dl_done_body')),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Fermer'),
+              child: Text(l10n.t('close')),
             ),
             if (_tabIndex != 2)
               FilledButton.icon(
@@ -218,7 +233,7 @@ class _HomeShellState extends State<HomeShell> {
                   _openSeedrTab(refresh: true);
                 },
                 icon: const Icon(Icons.cloud_done_outlined, size: 17),
-                label: const Text('Ouvrir Seedr'),
+                label: Text(l10n.t('open_seedr')),
               ),
           ],
         ),
@@ -233,25 +248,23 @@ class _HomeShellState extends State<HomeShell> {
   // -------------------------------------------------------------------
   Future<void> _openDonateDialog() async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppL10n.of(context);
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF111C33),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.volunteer_activism_outlined, color: Color(0xFFF472B6), size: 26),
-            SizedBox(width: 10),
-            Expanded(child: Text('Soutenir Torrent Seeder')),
+            const Icon(Icons.volunteer_activism_outlined, color: Color(0xFFF472B6), size: 26),
+            const SizedBox(width: 10),
+            Expanded(child: Text(l10n.t('donate_title'))),
           ],
         ),
-        content: const Text(
-          'Torrent Seeder est 100 % gratuit, open-source et sans publicité.\n\n'
-          'Si l\'application vous est utile, vous pouvez soutenir son développement via GitHub Sponsors.',
-        ),
+        content: Text(l10n.t('donate_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Plus tard'),
+            child: Text(l10n.t('donate_later')),
           ),
           FilledButton.icon(
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDB2777)),
@@ -262,14 +275,12 @@ class _HomeShellState extends State<HomeShell> {
               if (!ok) {
                 await Clipboard.setData(const ClipboardData(text: HomeShell.sponsorUrl));
                 messenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Lien GitHub Sponsors copié dans le presse-papiers.'),
-                  ),
+                  SnackBar(content: Text(l10n.t('donate_copied'))),
                 );
               }
             },
             icon: const Icon(Icons.favorite_outline, size: 17),
-            label: const Text('Faire un don (GitHub Sponsors)'),
+            label: Text(l10n.t('donate_cta')),
           ),
         ],
       ),
@@ -291,6 +302,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final watchlistCount = widget.storage.watchlist.length;
     final seedrCount = widget.storage.seedrAccounts.length;
 
@@ -315,36 +327,80 @@ class _HomeShellState extends State<HomeShell> {
               ),
             ),
             const SizedBox(width: 10),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Torrent Seeder',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-                ),
-                Text(
-                  'Autonome • Films & Séries • Bac à sable actif',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF22C55E),
-                    fontWeight: FontWeight.w600,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Torrent Seeder',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
                   ),
-                ),
-              ],
+                  Text(
+                    l10n.t('app_subtitle'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF22C55E),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            tooltip: 'Soutenir le projet (GitHub Sponsors)',
+            tooltip: l10n.t('tooltip_donate'),
             icon: const Icon(
               Icons.volunteer_activism_outlined,
               color: Color(0xFFF472B6),
             ),
             onPressed: _openDonateDialog,
           ),
+          PopupMenuButton<String>(
+            key: const Key('language_switcher_btn'),
+            tooltip: l10n.t('tooltip_language'),
+            color: const Color(0xFF111C33),
+            initialValue: l10n.code,
+            onSelected: _selectLanguage,
+            itemBuilder: (_) => AppL10n.supported.map((opt) {
+              final selected = opt.code == l10n.code;
+              return PopupMenuItem<String>(
+                value: opt.code,
+                child: Row(
+                  children: [
+                    CountryFlag(code: opt.flagCode, width: 22, height: 15),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        opt.nativeName,
+                        style: TextStyle(
+                          fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                          color: selected ? const Color(0xFF38BDF8) : null,
+                        ),
+                      ),
+                    ),
+                    if (selected)
+                      const Icon(Icons.check, size: 16, color: Color(0xFF22C55E)),
+                  ],
+                ),
+              );
+            }).toList(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CountryFlag(code: l10n.flagCode, width: 22, height: 15),
+                  const Icon(Icons.arrow_drop_down, size: 18, color: Color(0xFF94A3B8)),
+                ],
+              ),
+            ),
+          ),
           IconButton(
-            tooltip: 'Réglages sécurité, Seedr & sources',
+            tooltip: l10n.t('tooltip_settings'),
             icon: const Icon(Icons.settings_outlined),
             onPressed: _ready ? _openSettings : null,
           ),
@@ -389,9 +445,9 @@ class _HomeShellState extends State<HomeShell> {
           });
         },
         destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.search),
-            label: 'Rechercher',
+          NavigationDestination(
+            icon: const Icon(Icons.search),
+            label: l10n.t('tab_search'),
           ),
           NavigationDestination(
             icon: Badge(
@@ -399,7 +455,7 @@ class _HomeShellState extends State<HomeShell> {
               label: Text('$watchlistCount'),
               child: const Icon(Icons.bookmark_outline),
             ),
-            label: 'Plus tard',
+            label: l10n.t('tab_watchlist'),
           ),
           NavigationDestination(
             icon: Badge(
@@ -409,7 +465,7 @@ class _HomeShellState extends State<HomeShell> {
               smallSize: 8,
               child: const Icon(Icons.cloud_outlined),
             ),
-            label: 'Seedr',
+            label: l10n.t('tab_seedr'),
           ),
         ],
       ),

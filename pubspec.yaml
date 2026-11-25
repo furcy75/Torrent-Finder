@@ -1,5 +1,5 @@
 name: safetorrent
-description: "Torrent Seeder — Application 100% autonome (Android APK, Windows, Linux) avec bac à sable anti-virus et intégration Seedr multi-comptes pour films et séries."
+description: "Torrent Seeder — Standalone Movie & TV Series torrent search engine (Android, Windows, Linux) with built-in anti-malware sandbox, multi-account Seedr.cc integration, and 6-language UI."
 publish_to: 'none'
 version: 2.0.0+9
 

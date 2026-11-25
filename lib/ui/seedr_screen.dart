@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:safetorrent/l10n/app_l10n.dart';
 import 'package:safetorrent/models/seedr_models.dart';
 import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/services/release_parser.dart';
@@ -34,7 +35,6 @@ class SeedrScreen extends StatefulWidget {
 class _SeedrScreenState extends State<SeedrScreen> {
   late final SeedrService _seedr = SeedrService(storage: widget.storage);
 
-  // Add-account / login UI state
   bool _showAddAccountForm = false;
   bool _useDeviceFlow = true;
   final _labelCtrl = TextEditingController();
@@ -46,7 +46,6 @@ class _SeedrScreenState extends State<SeedrScreen> {
   SeedrDeviceCode? _pendingDeviceCode;
   Timer? _devicePollTimer;
 
-  // Live account explorer state
   SeedrFolderContents? _contents;
   final List<(String id, String name)> _folderStack = [];
   bool _loadingFolder = false;
@@ -152,6 +151,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
   Future<void> _checkDeviceApproval({bool silent = false}) async {
     final pending = _pendingDeviceCode;
     if (pending == null) return;
+    final l10n = AppL10n.of(context);
     try {
       final session = await _seedr.pollDeviceAuthorization(
         pending.deviceCode,
@@ -170,10 +170,10 @@ class _SeedrScreenState extends State<SeedrScreen> {
           _folderStack.clear();
         });
         widget.onSessionChanged();
-        _showSnack('Compte Seedr « ${session.displayName} » connecté !');
+        _showSnack(l10n.t('account_connected', {'name': session.displayName}));
         await _loadFolder();
       } else if (!silent) {
-        _showSnack('En attente de validation sur seedr.cc/devices...');
+        _showSnack(l10n.t('waiting_approval'));
       }
     } catch (e) {
       _devicePollTimer?.cancel();
@@ -190,10 +190,11 @@ class _SeedrScreenState extends State<SeedrScreen> {
   // Auth Mode 2: Email + Password Flow
   // -------------------------------------------------------------------
   Future<void> _loginWithPassword() async {
+    final l10n = AppL10n.of(context);
     final email = _emailCtrl.text.trim();
     final pass = _passCtrl.text;
     if (email.isEmpty || pass.isEmpty) {
-      setState(() => _authError = 'Veuillez saisir votre email et votre mot de passe Seedr.');
+      setState(() => _authError = l10n.t('enter_email_pass'));
       return;
     }
     FocusScope.of(context).unfocus();
@@ -218,7 +219,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
         _folderStack.clear();
       });
       widget.onSessionChanged();
-      _showSnack('Compte Seedr « ${session.displayName} » connecté !');
+      _showSnack(l10n.t('account_connected', {'name': session.displayName}));
       await _loadFolder();
     } catch (e) {
       if (!mounted) return;
@@ -230,24 +231,23 @@ class _SeedrScreenState extends State<SeedrScreen> {
   }
 
   Future<void> _promptRenameAccount(SeedrSession account) async {
+    final l10n = AppL10n.of(context);
     final ctrl = TextEditingController(text: account.displayName);
     final newName = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF111C33),
-        title: const Text('Renommer ce compte Seedr'),
+        title: Text(l10n.t('rename_account_title')),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Nom du compte (ex : Principal, Compte 2...)',
-          ),
+          decoration: InputDecoration(labelText: l10n.t('account_label_field')),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l10n.t('cancel'))),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Enregistrer'),
+            child: Text(l10n.t('save')),
           ),
         ],
       ),
@@ -263,20 +263,19 @@ class _SeedrScreenState extends State<SeedrScreen> {
   Future<void> _disconnectActiveAccount() async {
     final active = _seedr.activeAccount;
     if (active == null) return;
+    final l10n = AppL10n.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF111C33),
-        title: const Text('Déconnecter ce compte Seedr ?'),
-        content: Text(
-          'Voulez-vous retirer le compte « ${active.displayName} » de cet appareil ?',
-        ),
+        title: Text(l10n.t('disconnect_title')),
+        content: Text(l10n.t('disconnect_body', {'name': active.displayName})),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.t('cancel'))),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Déconnecter'),
+            child: Text(l10n.t('disconnect')),
           ),
         ],
       ),
@@ -293,7 +292,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
       _showAddAccountForm = false;
     });
     widget.onSessionChanged();
-    _showSnack('Compte « ${active.displayName} » déconnecté.');
+    _showSnack(l10n.t('account_disconnected', {'name': active.displayName}));
     if (_seedr.isConnected) {
       await _loadFolder();
     }
@@ -336,45 +335,48 @@ class _SeedrScreenState extends State<SeedrScreen> {
       if (!mounted) return;
       setState(() {
         _loadingFolder = false;
-        _folderError = 'Erreur réseau Seedr : $e';
+        _folderError = '$e';
       });
     }
   }
 
   Future<void> _openExternalUrl(String rawUrl) async {
+    final l10n = AppL10n.of(context);
     final uri = Uri.tryParse(rawUrl);
     if (uri == null) return;
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && mounted) {
       await Clipboard.setData(ClipboardData(text: rawUrl));
-      _showSnack('Lien copié dans le presse-papiers (impossible d\'ouvrir le navigateur).');
+      _showSnack(l10n.t('browser_open_failed'));
     }
   }
 
   Future<void> _downloadFile(SeedrFileEntry file, {bool copyOnly = false}) async {
+    final l10n = AppL10n.of(context);
     try {
-      _showSnack('Récupération du lien direct HTTPS...');
+      _showSnack(l10n.t('fetching_https'));
       final url = await _seedr.fetchFileDownloadUrl(file.folderFileId);
       if (!mounted) return;
       if (copyOnly) {
         await Clipboard.setData(ClipboardData(text: url));
-        _showSnack('Lien direct HTTPS copié (prêt pour VLC ou gestionnaire de téléchargement).');
+        _showSnack(l10n.t('https_copied'));
       } else {
         await _openExternalUrl(url);
       }
     } catch (e) {
-      _showSnack('Erreur : $e');
+      _showSnack('$e');
     }
   }
 
   Future<void> _downloadFolderZip(SeedrFolderEntry folder) async {
+    final l10n = AppL10n.of(context);
     try {
-      _showSnack('Préparation de l\'archive ZIP Seedr...');
+      _showSnack(l10n.t('preparing_zip'));
       final url = await _seedr.createFolderZipUrl(folder.id);
       if (!mounted) return;
       await _openExternalUrl(url);
     } catch (e) {
-      _showSnack('Erreur ZIP : $e');
+      _showSnack('$e');
     }
   }
 
@@ -383,18 +385,19 @@ class _SeedrScreenState extends State<SeedrScreen> {
     required String id,
     required String label,
   }) async {
+    final l10n = AppL10n.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF111C33),
-        title: const Text('Supprimer de Seedr ?'),
-        content: Text('Voulez-vous supprimer « $label » de cet espace Seedr ?'),
+        title: Text(l10n.t('delete_seedr_title')),
+        content: Text(l10n.t('delete_seedr_body', {'label': label})),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.t('cancel'))),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Supprimer'),
+            child: Text(l10n.t('delete')),
           ),
         ],
       ),
@@ -405,34 +408,35 @@ class _SeedrScreenState extends State<SeedrScreen> {
         widget.onTransferCancelled?.call(id);
       }
       await _seedr.deleteItem(type: type, id: id);
-      _showSnack('« $label » supprimé de Seedr.');
+      _showSnack(l10n.t('deleted_from_seedr', {'label': label}));
       await _loadFolder(folderId: _currentFolderId);
     } catch (e) {
-      _showSnack('Erreur suppression : $e');
+      _showSnack('$e');
     }
   }
 
   Future<void> _promptAddManualMagnet() async {
     final active = _seedr.activeAccount;
     if (active == null) return;
+    final l10n = AppL10n.of(context);
     final ctrl = TextEditingController();
     final magnet = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF111C33),
-        title: Text('Ajouter un Magnet sur « ${active.displayName} »'),
+        title: Text(l10n.t('add_magnet_title', {'name': active.displayName})),
         content: TextField(
           controller: ctrl,
           autofocus: true,
           decoration: const InputDecoration(
-            labelText: 'Lien magnet:?xt=urn:btih:...',
+            labelText: 'magnet:?xt=urn:btih:...',
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l10n.t('cancel'))),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Envoyer'),
+            child: Text(l10n.t('send')),
           ),
         ],
       ),
@@ -456,19 +460,17 @@ class _SeedrScreenState extends State<SeedrScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final showLogin = !_seedr.isConnected || _showAddAccountForm;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 960),
-        child: showLogin ? _buildLoginView() : _buildDashboard(),
+        child: showLogin ? _buildLoginView(l10n) : _buildDashboard(l10n),
       ),
     );
   }
 
-  // -------------------------------------------------------------------
-  // Multi-Account Switcher Card
-  // -------------------------------------------------------------------
-  Widget _buildAccountsBar() {
+  Widget _buildAccountsBar(AppL10n l10n) {
     final accounts = _seedr.accounts;
     final activeId = _seedr.activeAccount?.id;
 
@@ -484,7 +486,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
                 const Icon(Icons.switch_account_outlined, color: Color(0xFF38BDF8), size: 18),
                 const SizedBox(width: 6),
                 Text(
-                  'Comptes Seedr (${accounts.length})',
+                  l10n.t('seedr_accounts_header', {'count': '${accounts.length}'}),
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
                 ),
                 const Spacer(),
@@ -498,7 +500,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
                     });
                   },
                   icon: const Icon(Icons.person_add_alt_1_outlined, size: 17),
-                  label: const Text('Ajouter un compte'),
+                  label: Text(l10n.t('add_account')),
                 ),
               ],
             ),
@@ -509,7 +511,9 @@ class _SeedrScreenState extends State<SeedrScreen> {
               children: accounts.map((acc) {
                 final selected = acc.id == activeId && !_showAddAccountForm;
                 final free = acc.lastSpaceFree;
-                final suffix = free != null ? ' • ${ReleaseParser.formatSize(free)} libre' : '';
+                final suffix = free != null
+                    ? ' • ${l10n.t('free_suffix', {'size': ReleaseParser.formatSize(free)})}'
+                    : '';
                 return ChoiceChip(
                   selected: selected,
                   onSelected: (_) => _switchAccount(acc.id),
@@ -528,17 +532,14 @@ class _SeedrScreenState extends State<SeedrScreen> {
     );
   }
 
-  // -------------------------------------------------------------------
-  // Login View (Add First or Additional Account)
-  // -------------------------------------------------------------------
-  Widget _buildLoginView() {
+  Widget _buildLoginView(AppL10n l10n) {
     final pending = _pendingDeviceCode;
     final hasExistingAccounts = _seedr.isConnected;
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (hasExistingAccounts) _buildAccountsBar(),
+        if (hasExistingAccounts) _buildAccountsBar(l10n),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -555,13 +556,13 @@ class _SeedrScreenState extends State<SeedrScreen> {
                         children: [
                           Text(
                             hasExistingAccounts
-                                ? 'Ajouter un compte Seedr'
-                                : 'Connexion à Seedr.cc',
+                                ? l10n.t('add_seedr_account')
+                                : l10n.t('connect_seedr'),
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                           ),
-                          const Text(
-                            'Connectez un ou plusieurs comptes Seedr et choisissez celui à utiliser selon le quota disponible.',
-                            style: TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+                          Text(
+                            l10n.t('connect_seedr_subtitle'),
+                            style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
                           ),
                         ],
                       ),
@@ -577,16 +578,16 @@ class _SeedrScreenState extends State<SeedrScreen> {
                           });
                         },
                         icon: const Icon(Icons.arrow_back, size: 16),
-                        label: const Text('Retour'),
+                        label: Text(l10n.t('back')),
                       ),
                   ],
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _labelCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Nom du compte (ex : Principal, Compte 2...)',
-                    prefixIcon: Icon(Icons.badge_outlined),
+                  decoration: InputDecoration(
+                    labelText: l10n.t('account_label_field'),
+                    prefixIcon: const Icon(Icons.badge_outlined),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -601,7 +602,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
                         _authError = null;
                       }),
                       avatar: const Icon(Icons.qr_code_2, size: 17),
-                      label: const Text('Code Appareil (Recommandé)'),
+                      label: Text(l10n.t('auth_device')),
                     ),
                     ChoiceChip(
                       selected: !_useDeviceFlow,
@@ -610,15 +611,15 @@ class _SeedrScreenState extends State<SeedrScreen> {
                         _authError = null;
                       }),
                       avatar: const Icon(Icons.mail_outline, size: 17),
-                      label: const Text('Email & Mot de passe'),
+                      label: Text(l10n.t('auth_password')),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
                 if (_useDeviceFlow) ...[
-                  const Text(
-                    'Méthode la plus sûre : aucun mot de passe n\'est saisi dans l\'application. Un code court vous permet d\'autoriser Torrent Seeder depuis seedr.cc/devices.',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  Text(
+                    l10n.t('auth_device_desc'),
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                   ),
                   const SizedBox(height: 14),
                   if (pending == null)
@@ -631,7 +632,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.key_outlined),
-                      label: const Text('Générer un code de connexion Seedr'),
+                      label: Text(l10n.t('generate_device_code')),
                     )
                   else
                     Container(
@@ -643,9 +644,9 @@ class _SeedrScreenState extends State<SeedrScreen> {
                       ),
                       child: Column(
                         children: [
-                          const Text(
-                            'Saisissez ce code sur seedr.cc/devices :',
-                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                          Text(
+                            l10n.t('enter_code_on_seedr'),
+                            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                           ),
                           const SizedBox(height: 8),
                           SelectableText(
@@ -666,36 +667,36 @@ class _SeedrScreenState extends State<SeedrScreen> {
                               OutlinedButton.icon(
                                 onPressed: () async {
                                   await Clipboard.setData(ClipboardData(text: pending.userCode));
-                                  _showSnack('Code « ${pending.userCode} » copié.');
+                                  _showSnack(l10n.t('code_copied', {'code': pending.userCode}));
                                 },
                                 icon: const Icon(Icons.copy, size: 16),
-                                label: const Text('Copier le code'),
+                                label: Text(l10n.t('copy_code')),
                               ),
                               FilledButton.icon(
                                 onPressed: () => _openExternalUrl(pending.verificationUrl),
                                 icon: const Icon(Icons.open_in_new, size: 16),
-                                label: const Text('Ouvrir seedr.cc/devices'),
+                                label: Text(l10n.t('open_seedr_devices')),
                               ),
                               TextButton.icon(
                                 onPressed: () => _checkDeviceApproval(silent: false),
                                 icon: const Icon(Icons.check_circle_outline, size: 16),
-                                label: const Text('Vérifier maintenant'),
+                                label: Text(l10n.t('check_now')),
                               ),
                             ],
                           ),
                           const SizedBox(height: 10),
-                          const Row(
+                          Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              SizedBox(
+                              const SizedBox(
                                 width: 14,
                                 height: 14,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Text(
-                                'Vérification automatique en cours...',
-                                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                                l10n.t('auto_checking'),
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                               ),
                             ],
                           ),
@@ -706,9 +707,9 @@ class _SeedrScreenState extends State<SeedrScreen> {
                   TextField(
                     controller: _emailCtrl,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email Seedr',
-                      prefixIcon: Icon(Icons.email_outlined),
+                    decoration: InputDecoration(
+                      labelText: l10n.t('seedr_email'),
+                      prefixIcon: const Icon(Icons.email_outlined),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -717,7 +718,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
                     obscureText: _obscurePass,
                     onSubmitted: (_) => _loginWithPassword(),
                     decoration: InputDecoration(
-                      labelText: 'Mot de passe Seedr',
+                      labelText: l10n.t('seedr_password'),
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         onPressed: () => setState(() => _obscurePass = !_obscurePass),
@@ -726,9 +727,9 @@ class _SeedrScreenState extends State<SeedrScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Votre mot de passe n\'est jamais enregistré : seul le jeton OAuth est conservé localement sur votre appareil.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  Text(
+                    l10n.t('password_never_saved'),
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                   ),
                   const SizedBox(height: 12),
                   FilledButton.icon(
@@ -740,7 +741,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.login),
-                    label: const Text('Se connecter à Seedr'),
+                    label: Text(l10n.t('login_seedr')),
                   ),
                 ],
                 if (_authError != null) ...[
@@ -765,10 +766,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
     );
   }
 
-  // -------------------------------------------------------------------
-  // Connected Live Dashboard
-  // -------------------------------------------------------------------
-  Widget _buildDashboard() {
+  Widget _buildDashboard(AppL10n l10n) {
     final s = _seedr.activeAccount!;
     final c = _contents;
     final ratio = c?.usedRatio ?? s.usedRatio;
@@ -785,9 +783,8 @@ class _SeedrScreenState extends State<SeedrScreen> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildAccountsBar(),
+          _buildAccountsBar(l10n),
 
-          // Active Account & Quota Card
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -809,8 +806,11 @@ class _SeedrScreenState extends State<SeedrScreen> {
                             Text(
                               [
                                 if (s.username != null && s.username != s.displayName) s.username!,
-                                if (s.packageName != null) 'Offre : ${s.packageName}',
-                                s.authMode == 'device' ? 'Code Appareil' : 'OAuth Email',
+                                if (s.packageName != null)
+                                  l10n.t('offer_label', {'plan': s.packageName!}),
+                                s.authMode == 'device'
+                                    ? l10n.t('mode_device')
+                                    : l10n.t('mode_email'),
                               ].join(' • '),
                               style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                             ),
@@ -818,18 +818,18 @@ class _SeedrScreenState extends State<SeedrScreen> {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Renommer ce compte',
+                        tooltip: l10n.t('tooltip_rename'),
                         onPressed: () => _promptRenameAccount(s),
                         icon: const Icon(Icons.edit_outlined, size: 20),
                       ),
                       IconButton(
-                        tooltip: 'Actualiser Seedr',
+                        tooltip: l10n.t('tooltip_refresh'),
                         onPressed:
                             _loadingFolder ? null : () => _loadFolder(folderId: _currentFolderId),
                         icon: const Icon(Icons.refresh),
                       ),
                       IconButton(
-                        tooltip: 'Déconnecter ce compte',
+                        tooltip: l10n.t('tooltip_disconnect'),
                         onPressed: _disconnectActiveAccount,
                         icon: const Icon(Icons.logout, color: Color(0xFFEF4444)),
                       ),
@@ -841,11 +841,18 @@ class _SeedrScreenState extends State<SeedrScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Espace utilisé : ${ReleaseParser.formatSize(spaceUsed)} / ${ReleaseParser.formatSize(spaceMax)}',
+                          l10n.t('space_used', {
+                            'used': ReleaseParser.formatSize(spaceUsed),
+                            'max': ReleaseParser.formatSize(spaceMax),
+                          }),
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                         ),
                         Text(
-                          'Libre : ${ReleaseParser.formatSize((spaceMax - spaceUsed).clamp(0, spaceMax))}',
+                          l10n.t('space_free', {
+                            'free': ReleaseParser.formatSize(
+                              (spaceMax - spaceUsed).clamp(0, spaceMax),
+                            ),
+                          }),
                           style: const TextStyle(fontSize: 12, color: Color(0xFF86EFAC)),
                         ),
                       ],
@@ -869,12 +876,12 @@ class _SeedrScreenState extends State<SeedrScreen> {
                       FilledButton.icon(
                         onPressed: _promptAddManualMagnet,
                         icon: const Icon(Icons.add_link, size: 17),
-                        label: const Text('Ajouter un Magnet'),
+                        label: Text(l10n.t('add_magnet')),
                       ),
                       OutlinedButton.icon(
                         onPressed: () => _openExternalUrl('https://www.seedr.cc/files'),
                         icon: const Icon(Icons.open_in_new, size: 16),
-                        label: const Text('Ouvrir Seedr Web'),
+                        label: Text(l10n.t('open_seedr_web')),
                       ),
                     ],
                   ),
@@ -902,11 +909,10 @@ class _SeedrScreenState extends State<SeedrScreen> {
               ),
             )
           else if (c != null) ...[
-            // Active transfers section
             if (c.torrents.isNotEmpty) ...[
-              const Text(
-                '⏳ Téléchargements en cours sur Seedr (actualisation auto)',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+              Text(
+                l10n.t('active_transfers_header'),
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
               ),
               const SizedBox(height: 8),
               ...c.torrents.map(
@@ -926,7 +932,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
                               ),
                             ),
                             IconButton(
-                              tooltip: 'Annuler ce transfert',
+                              tooltip: l10n.t('cancel_transfer'),
                               icon: const Icon(Icons.cancel_outlined, color: Color(0xFFEF4444)),
                               onPressed: () => _confirmAndDelete(
                                 type: 'torrent',
@@ -943,7 +949,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
                         const SizedBox(height: 6),
                         Text(
                           '${t.progress.toStringAsFixed(1)}% • ${ReleaseParser.formatSize(t.sizeBytes)} • '
-                          '${ReleaseParser.formatSize(t.downloadRate)}/s • ▲ ${t.seeders} seeders',
+                          '${ReleaseParser.formatSize(t.downloadRate)}/s • ▲ ${t.seeders}',
                           style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                         ),
                       ],
@@ -954,12 +960,11 @@ class _SeedrScreenState extends State<SeedrScreen> {
               const SizedBox(height: 12),
             ],
 
-            // Folder navigation breadcrumb
             Row(
               children: [
                 if (_folderStack.isNotEmpty)
                   IconButton(
-                    tooltip: 'Dossier parent',
+                    tooltip: l10n.t('parent_folder'),
                     onPressed: () {
                       setState(() => _folderStack.removeLast());
                       _loadFolder(folderId: _currentFolderId);
@@ -969,7 +974,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
                 Expanded(
                   child: Text(
                     _folderStack.isEmpty
-                        ? '📁 Fichiers Seedr (${s.displayName})'
+                        ? l10n.t('seedr_files_header', {'name': s.displayName})
                         : '📁 ${_folderStack.map((e) => e.$2).join(' / ')}',
                     style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                   ),
@@ -979,18 +984,17 @@ class _SeedrScreenState extends State<SeedrScreen> {
             const SizedBox(height: 8),
 
             if (c.folders.isEmpty && c.files.isEmpty)
-              const Card(
+              Card(
                 child: Padding(
-                  padding: EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(24),
                   child: Text(
-                    'Ce dossier Seedr est vide. Envoyez un film ou une série depuis l\'onglet Rechercher !',
+                    l10n.t('seedr_folder_empty'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Color(0xFF94A3B8)),
+                    style: const TextStyle(color: Color(0xFF94A3B8)),
                   ),
                 ),
               ),
 
-            // Folders list
             ...c.folders.map(
               (f) => Card(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -1010,12 +1014,12 @@ class _SeedrScreenState extends State<SeedrScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        tooltip: 'Télécharger le dossier en ZIP',
+                        tooltip: l10n.t('download_zip'),
                         icon: const Icon(Icons.folder_zip_outlined),
                         onPressed: () => _downloadFolderZip(f),
                       ),
                       IconButton(
-                        tooltip: 'Supprimer le dossier',
+                        tooltip: l10n.t('delete_folder'),
                         icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
                         onPressed: () => _confirmAndDelete(
                           type: 'folder',
@@ -1029,7 +1033,6 @@ class _SeedrScreenState extends State<SeedrScreen> {
               ),
             ),
 
-            // Files list
             ...c.files.map(
               (f) => Card(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -1069,12 +1072,12 @@ class _SeedrScreenState extends State<SeedrScreen> {
                           FilledButton.icon(
                             onPressed: () => _downloadFile(f, copyOnly: false),
                             icon: const Icon(Icons.download, size: 16),
-                            label: const Text('Télécharger (HTTPS)'),
+                            label: Text(l10n.t('download_https')),
                           ),
                           OutlinedButton.icon(
                             onPressed: () => _downloadFile(f, copyOnly: true),
                             icon: const Icon(Icons.copy, size: 16),
-                            label: const Text('Copier lien direct'),
+                            label: Text(l10n.t('copy_direct_link')),
                           ),
                           TextButton.icon(
                             onPressed: () => _confirmAndDelete(
@@ -1087,9 +1090,9 @@ class _SeedrScreenState extends State<SeedrScreen> {
                               size: 16,
                               color: Color(0xFFEF4444),
                             ),
-                            label: const Text(
-                              'Supprimer',
-                              style: TextStyle(color: Color(0xFFEF4444)),
+                            label: Text(
+                              l10n.t('delete'),
+                              style: const TextStyle(color: Color(0xFFEF4444)),
                             ),
                           ),
                         ],

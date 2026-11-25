@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:safetorrent/l10n/app_l10n.dart';
 import 'package:safetorrent/models/movie_suggestion.dart';
 import 'package:safetorrent/models/torrent_result.dart';
 import 'package:safetorrent/models/watchlist_item.dart';
@@ -41,7 +42,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     if (title.isEmpty) return;
     final notes = _notesCtrl.text.trim();
 
-    // Auto-fetch poster & series schedule if possible
     MovieSuggestion? resolved;
     final hits = await _allocineService.resolveTitles(title, mediaType: _manualType, limit: 1);
     if (hits.isNotEmpty) resolved = hits.first;
@@ -75,6 +75,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   }
 
   Future<void> _refreshSeriesDate(WatchlistItem item) async {
+    final l10n = AppL10n.of(context);
     setState(() => _refreshingIds.add(item.id));
     final info = await _allocineService.refreshSeriesSchedule(
       tvMazeId: item.tvMazeId,
@@ -100,7 +101,10 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           content: Text(
             info?.nextSeasonInfo != null
                 ? '${item.titleFr} : ${info!.nextSeasonInfo}'
-                : '${item.titleFr} : calendrier vérifié (${info?.status ?? 'aucune nouvelle date'}).',
+                : l10n.t('schedule_checked', {
+                    'title': item.titleFr,
+                    'status': info?.status ?? l10n.t('no_new_date'),
+                  }),
           ),
         ),
       );
@@ -142,6 +146,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final items = widget.storage.watchlist;
 
     return Center(
@@ -150,14 +155,14 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text(
-              '📌 À rechercher plus tard (Films & Séries)',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            Text(
+              l10n.t('watchlist_title'),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Sauvegardés localement avec leur vignette et les dates des prochaines saisons.',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+            Text(
+              l10n.t('watchlist_subtitle'),
+              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
             ),
             const SizedBox(height: 14),
             Card(
@@ -172,12 +177,12 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                         ChoiceChip(
                           selected: _manualType == MediaType.movie,
                           onSelected: (_) => setState(() => _manualType = MediaType.movie),
-                          label: const Text('🎬 Film'),
+                          label: Text(l10n.t('chip_movie')),
                         ),
                         ChoiceChip(
                           selected: _manualType == MediaType.series,
                           onSelected: (_) => setState(() => _manualType = MediaType.series),
-                          label: const Text('📺 Série'),
+                          label: Text(l10n.t('chip_series')),
                         ),
                       ],
                     ),
@@ -186,8 +191,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                       controller: _titleCtrl,
                       decoration: InputDecoration(
                         labelText: _manualType == MediaType.series
-                            ? 'Ajouter une série à suivre'
-                            : 'Ajouter un film à surveiller',
+                            ? l10n.t('add_series_watch')
+                            : l10n.t('add_movie_watch'),
                         isDense: true,
                       ),
                     ),
@@ -197,8 +202,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                         Expanded(
                           child: TextField(
                             controller: _notesCtrl,
-                            decoration: const InputDecoration(
-                              hintText: 'Note (ex : Saison 3, 1080p VFF < 5 Go)',
+                            decoration: InputDecoration(
+                              hintText: l10n.t('note_hint'),
                               isDense: true,
                             ),
                           ),
@@ -206,7 +211,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                         const SizedBox(width: 8),
                         FilledButton(
                           onPressed: _addManual,
-                          child: const Text('+ Ajouter'),
+                          child: Text(l10n.t('add_plus')),
                         ),
                       ],
                     ),
@@ -216,25 +221,25 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
             ),
             const SizedBox(height: 14),
             if (items.isEmpty)
-              const Card(
+              Card(
                 child: Padding(
-                  padding: EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(24),
                   child: Text(
-                    'Aucun film ou série en attente pour le moment.',
+                    l10n.t('watchlist_empty'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Color(0xFF94A3B8)),
+                    style: const TextStyle(color: Color(0xFF94A3B8)),
                   ),
                 ),
               )
             else
-              ...items.map(_buildWatchlistCard),
+              ...items.map((item) => _buildWatchlistCard(l10n, item)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildWatchlistCard(WatchlistItem item) {
+  Widget _buildWatchlistCard(AppL10n l10n, WatchlistItem item) {
     final isSeries = item.mediaType == MediaType.series;
     final refreshing = _refreshingIds.contains(item.id);
 
@@ -260,7 +265,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                         ),
                       ),
                       Text(
-                        item.found ? '✅ ${item.lastResultCount} trouvé(s)' : '⏳ En attente',
+                        item.found
+                            ? l10n.t('found_count', {'n': '${item.lastResultCount}'})
+                            : l10n.t('pending_status'),
                         style: TextStyle(
                           fontSize: 12,
                           color: item.found ? const Color(0xFF22C55E) : const Color(0xFFF59E0B),
@@ -275,13 +282,13 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                     runSpacing: 5,
                     children: [
                       _badge(
-                        isSeries ? '📺 Série' : '🎬 Film',
+                        isSeries ? l10n.t('chip_series') : l10n.t('chip_movie'),
                         const Color(0xFF1E293B),
                         const Color(0xFFCBD5E1),
                       ),
                       if (isSeries && item.seasonCount != null)
                         _badge(
-                          '${item.seasonCount} saison${item.seasonCount! > 1 ? 's' : ''}',
+                          '${item.seasonCount} ${item.seasonCount! > 1 ? l10n.t('season_plural') : l10n.t('season_singular')}',
                           const Color(0xFF1E3A8A),
                           const Color(0xFFBFDBFE),
                         ),
@@ -324,7 +331,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                           ),
                         ),
                         icon: const Icon(Icons.search, size: 16),
-                        label: const Text('Relancer'),
+                        label: Text(l10n.t('relaunch')),
                       ),
                       if (isSeries)
                         OutlinedButton.icon(
@@ -336,7 +343,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Icon(Icons.event_repeat_outlined, size: 16),
-                          label: const Text('Actualiser date'),
+                          label: Text(l10n.t('refresh_date')),
                         ),
                       TextButton.icon(
                         onPressed: () async {
@@ -349,9 +356,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                           size: 16,
                           color: Color(0xFFEF4444),
                         ),
-                        label: const Text(
-                          'Supprimer',
-                          style: TextStyle(color: Color(0xFFEF4444)),
+                        label: Text(
+                          l10n.t('delete'),
+                          style: const TextStyle(color: Color(0xFFEF4444)),
                         ),
                       ),
                     ],

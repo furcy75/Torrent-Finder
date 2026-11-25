@@ -32,6 +32,7 @@ class TorznabConfig {
 
 class AppSettings {
   const AppSettings({
+    this.appLanguage = '',
     this.strictVideoOnly = true,
     this.blockArchives = true,
     this.enableYts = true,
@@ -47,6 +48,8 @@ class AppSettings {
     this.torznabIndexers = const [],
   });
 
+  /// Explicit UI language code (`en`, `fr`, `es`, `de`, `nl`, `it`), or `''` for auto-detect.
+  final String appLanguage;
   final bool strictVideoOnly;
   final bool blockArchives;
   final bool enableYts;
@@ -62,6 +65,7 @@ class AppSettings {
   final List<TorznabConfig> torznabIndexers;
 
   AppSettings copyWith({
+    String? appLanguage,
     bool? strictVideoOnly,
     bool? blockArchives,
     bool? enableYts,
@@ -77,6 +81,7 @@ class AppSettings {
     List<TorznabConfig>? torznabIndexers,
   }) {
     return AppSettings(
+      appLanguage: appLanguage ?? this.appLanguage,
       strictVideoOnly: strictVideoOnly ?? this.strictVideoOnly,
       blockArchives: blockArchives ?? this.blockArchives,
       enableYts: enableYts ?? this.enableYts,
@@ -94,6 +99,7 @@ class AppSettings {
   }
 
   Map<String, dynamic> toJson() => {
+        'appLanguage': appLanguage,
         'strictVideoOnly': strictVideoOnly,
         'blockArchives': blockArchives,
         'enableYts': enableYts,
@@ -110,6 +116,7 @@ class AppSettings {
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
+        appLanguage: json['appLanguage'] as String? ?? '',
         strictVideoOnly: json['strictVideoOnly'] as bool? ?? true,
         blockArchives: json['blockArchives'] as bool? ?? true,
         enableYts: json['enableYts'] as bool? ?? true,

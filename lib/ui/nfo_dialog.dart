@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:safetorrent/l10n/app_l10n.dart';
 import 'package:safetorrent/models/torrent_result.dart';
 import 'package:safetorrent/services/nfo_service.dart';
 
@@ -30,28 +31,29 @@ class _NfoDialogState extends State<NfoDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final details = _details;
 
     return AlertDialog(
       backgroundColor: const Color(0xFF111C33),
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.description_outlined, color: Color(0xFF38BDF8)),
-          SizedBox(width: 8),
-          Expanded(child: Text('Détails & NFO')),
+          const Icon(Icons.description_outlined, color: Color(0xFF38BDF8)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(l10n.t('nfo_title'))),
         ],
       ),
       content: SizedBox(
         width: 620,
         height: 440,
         child: details == null
-            ? const Center(
+            ? Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 12),
-                    Text('Récupération du NFO / infos techniques (texte brut)...'),
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 12),
+                    Text(l10n.t('nfo_loading')),
                   ],
                 ),
               )
@@ -66,7 +68,7 @@ class _NfoDialogState extends State<NfoDialog> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Source : ${details.sourceLabel} • Affichage texte brut sécurisé (sans HTML/JS)',
+                    l10n.t('nfo_source', {'source': details.sourceLabel}),
                     style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
                   ),
                   const SizedBox(height: 10),
@@ -99,19 +101,16 @@ class _NfoDialogState extends State<NfoDialog> {
         if (details != null)
           TextButton.icon(
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
               await Clipboard.setData(ClipboardData(text: details.content));
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Contenu NFO copié.')),
-                );
-              }
+              messenger.showSnackBar(SnackBar(content: Text(l10n.t('nfo_copied'))));
             },
             icon: const Icon(Icons.copy, size: 16),
-            label: const Text('Copier'),
+            label: Text(l10n.t('copy')),
           ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Fermer'),
+          child: Text(l10n.t('close')),
         ),
       ],
     );

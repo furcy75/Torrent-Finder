@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:safetorrent/l10n/app_l10n.dart';
 import 'package:safetorrent/models/seedr_models.dart';
 import 'package:safetorrent/services/local_storage.dart';
 import 'package:safetorrent/services/release_parser.dart';
@@ -63,7 +64,6 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
     setState(() => _loading = true);
     final fresh = await _seedr.fetchAllAccountsQuota();
     if (!mounted) return;
-    // Sort visually: fits & idle first, then fits & busy, then unknown, then insufficient quota
     fresh.sort((a, b) {
       int rank(SeedrAccountQuota q) {
         final fit = q.canFit(widget.torrentSizeBytes);
@@ -86,9 +86,11 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final sizeKnown = widget.torrentSizeBytes > 0;
-    final sizeText =
-        sizeKnown ? ReleaseParser.formatSize(widget.torrentSizeBytes) : 'Taille non précisée';
+    final sizeText = sizeKnown
+        ? ReleaseParser.formatSize(widget.torrentSizeBytes)
+        : l10n.t('picker_size_unknown');
 
     return AlertDialog(
       backgroundColor: const Color(0xFF111C33),
@@ -96,9 +98,9 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
         children: [
           const Icon(Icons.cloud_upload_outlined, color: Color(0xFF38BDF8)),
           const SizedBox(width: 8),
-          const Expanded(child: Text('Choisir un compte Seedr')),
+          Expanded(child: Text(l10n.t('picker_title'))),
           IconButton(
-            tooltip: 'Actualiser les quotas',
+            tooltip: l10n.t('picker_refresh'),
             onPressed: _loading ? null : _refreshQuotas,
             icon: _loading
                 ? const SizedBox(
@@ -136,7 +138,7 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Taille requise : $sizeText',
+                      l10n.t('picker_required_size', {'size': sizeText}),
                       style: const TextStyle(fontSize: 12, color: Color(0xFF7DD3FC)),
                     ),
                   ],
@@ -144,13 +146,11 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
               ),
               const SizedBox(height: 12),
               Text(
-                _loading
-                    ? 'Vérification du quota et des téléchargements en cours...'
-                    : 'Sélectionnez le compte Seedr vers lequel envoyer ce torrent :',
+                _loading ? l10n.t('picker_loading') : l10n.t('picker_prompt'),
                 style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
               ),
               const SizedBox(height: 8),
-              ..._quotas.map(_buildAccountOption),
+              ..._quotas.map((q) => _buildAccountOption(l10n, q)),
             ],
           ),
         ),
@@ -158,13 +158,13 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
+          child: Text(l10n.t('cancel')),
         ),
       ],
     );
   }
 
-  Widget _buildAccountOption(SeedrAccountQuota q) {
+  Widget _buildAccountOption(AppL10n l10n, SeedrAccountQuota q) {
     final fit = q.canFit(widget.torrentSizeBytes);
     final free = q.spaceFree;
     final ratio = q.usedRatio;
@@ -183,19 +183,19 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
 
     final (badgeText, badgeBg, badgeFg) = switch (fit) {
       true => (
-          '✅ Espace suffisant (${ReleaseParser.formatSize(free!)} libre)',
+          l10n.t('picker_fits', {'free': ReleaseParser.formatSize(free!)}),
           const Color(0xFF14532D),
           const Color(0xFF86EFAC),
         ),
       false => (
-          '⚠️ Quota insuffisant (${ReleaseParser.formatSize(free!)} libre)',
+          l10n.t('picker_no_space', {'free': ReleaseParser.formatSize(free!)}),
           const Color(0xFF7F1D1D),
           const Color(0xFFFCA5A5),
         ),
       null => (
           free != null
-              ? '☁️ ${ReleaseParser.formatSize(free)} libre'
-              : (q.error != null ? '⚠️ Vérification impossible' : 'ℹ️ Quota en cours...'),
+              ? '☁️ ${l10n.t('free_suffix', {'size': ReleaseParser.formatSize(free)})}'
+              : (q.error != null ? l10n.t('picker_check_failed') : l10n.t('picker_checking')),
           const Color(0xFF1E293B),
           const Color(0xFFCBD5E1),
         ),
@@ -242,7 +242,7 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
                   FilledButton.tonalIcon(
                     onPressed: () => Navigator.of(context).pop(q.account),
                     icon: const Icon(Icons.send_outlined, size: 15),
-                    label: const Text('Envoyer'),
+                    label: Text(l10n.t('send')),
                   ),
                 ],
               ),
@@ -271,8 +271,10 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
                       ),
                       child: Text(
                         q.activeDownloadsCount == 1
-                            ? '⏳ Téléchargement en cours'
-                            : '⏳ ${q.activeDownloadsCount} téléchargements en cours',
+                            ? l10n.t('picker_downloading_one')
+                            : l10n.t('picker_downloading_many', {
+                                'n': '${q.activeDownloadsCount}',
+                              }),
                         style: const TextStyle(
                           color: Color(0xFFFDE68A),
                           fontSize: 11.5,
@@ -287,9 +289,9 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
                         color: const Color(0xFF0C4A6E),
                         borderRadius: BorderRadius.circular(999),
                       ),
-                      child: const Text(
-                        '✓ Aucun transfert en cours',
-                        style: TextStyle(
+                      child: Text(
+                        l10n.t('picker_idle'),
+                        style: const TextStyle(
                           color: Color(0xFF7DD3FC),
                           fontSize: 11.5,
                           fontWeight: FontWeight.w600,
@@ -304,11 +306,14 @@ class _SeedrPickerDialogState extends State<SeedrPickerDialog> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Utilisé : ${ReleaseParser.formatSize(q.spaceUsed!)} / ${ReleaseParser.formatSize(q.spaceMax!)}',
+                      l10n.t('space_used', {
+                        'used': ReleaseParser.formatSize(q.spaceUsed!),
+                        'max': ReleaseParser.formatSize(q.spaceMax!),
+                      }),
                       style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
                     ),
                     Text(
-                      'Libre : ${ReleaseParser.formatSize(free ?? 0)}',
+                      l10n.t('space_free', {'free': ReleaseParser.formatSize(free ?? 0)}),
                       style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
                     ),
                   ],

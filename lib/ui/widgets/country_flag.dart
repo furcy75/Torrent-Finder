@@ -108,6 +108,15 @@ class _FlagPainter extends CustomPainter {
         paint.color = const Color(0xFFFFCE00);
         canvas.drawRect(Rect.fromLTWH(0, 2 * h / 3, w, h / 3 + 0.5), paint);
 
+      case 'NL':
+        // Netherlands: Red / White / Blue horizontal stripes
+        paint.color = const Color(0xFFAE1C28);
+        canvas.drawRect(Rect.fromLTWH(0, 0, w, h / 3), paint);
+        paint.color = const Color(0xFFFFFFFF);
+        canvas.drawRect(Rect.fromLTWH(0, h / 3, w, h / 3), paint);
+        paint.color = const Color(0xFF21468B);
+        canvas.drawRect(Rect.fromLTWH(0, 2 * h / 3, w, h / 3 + 0.5), paint);
+
       case 'IT':
         // Italy: Green / White / Red
         paint.color = const Color(0xFF009246);

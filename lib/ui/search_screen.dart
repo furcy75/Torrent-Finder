@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:safetorrent/l10n/app_l10n.dart';
 import 'package:safetorrent/models/movie_suggestion.dart';
 import 'package:safetorrent/models/torrent_result.dart';
 import 'package:safetorrent/models/watchlist_item.dart';
@@ -50,20 +51,18 @@ class _SearchScreenState extends State<SearchScreen> {
   MediaType _mediaType = MediaType.movie;
   _SearchStage _stage = _SearchStage.input;
 
-  // Selected movie or TV series (retains posterUrl, localized titles & series schedule!)
   MovieSuggestion? _selectedMedia;
   final Set<String> _activeSearchTitles = {};
-  String? _selectedSeasonTag; // null (all), 'S01', 'S02', ..., or 'Complete'
+  String? _selectedSeasonTag;
 
   // Quick filter tags organized by category rows (CAM/TS excluded by default)
-  final Set<String> _langResultFilters = {}; // 'FR', 'EN', 'ES', 'MULTI'
+  final Set<String> _langResultFilters = {};
   bool _onlyActiveSeeders = false;
   bool _minTenSeeders = false;
   bool _excludeCam = true;
-  int? _maxSizeGb; // 2, 5, 10, or null
-  final Set<String> _resolutionFilters = {}; // '4K', '1080p', '720p'
-  final Set<String> _formatFilters =
-      {}; // 'BluRay', 'WEB-DL', 'WEBRip', 'HDRip', 'H.264 / x264', 'x265', 'HDR'
+  int? _maxSizeGb;
+  final Set<String> _resolutionFilters = {};
+  final Set<String> _formatFilters = {};
 
   _SortMode _sortMode = _SortMode.seeders;
   bool _loadingTitles = false;
@@ -95,7 +94,6 @@ class _SearchScreenState extends State<SearchScreen> {
       _stage = _SearchStage.results;
       _performTorrentSearch();
 
-      // If this saved item did not yet have a posterUrl, try enriching it silently
       if (media.posterUrl == null || media.posterUrl!.isEmpty) {
         _silentlyEnrichPoster(media, req.watchlistId);
       }
@@ -155,7 +153,6 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  /// Complete reset to start a brand-new search from scratch.
   void _resetAllToZero() {
     setState(() {
       _movieCtrl.clear();
@@ -170,7 +167,6 @@ class _SearchScreenState extends State<SearchScreen> {
       _loadingTitles = false;
       _searchingTorrents = false;
       _hasSearchedTorrents = false;
-      // Restore default filter tags (Exclure CAM/TS active by default)
       _langResultFilters.clear();
       _onlyActiveSeeders = false;
       _minTenSeeders = false;
@@ -204,16 +200,14 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  // -------------------------------------------------------------------
-  // Step 1 -> Step 2: Identify movie or series via AlloCiné / TVMaze / Wikidata
-  // -------------------------------------------------------------------
   Future<void> _identifyMedia() async {
+    final l10n = AppL10n.of(context);
     final query = _movieCtrl.text.trim();
     if (query.isEmpty) {
       _showSnack(
         _mediaType == MediaType.series
-            ? 'Saisissez d\'abord le nom d\'une série.'
-            : 'Saisissez d\'abord le nom d\'un film.',
+            ? l10n.t('enter_series_first')
+            : l10n.t('enter_movie_first'),
       );
       _movieFocus.requestFocus();
       return;
@@ -238,9 +232,6 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  // -------------------------------------------------------------------
-  // Step 2 -> Step 3: Pick movie/series match & display vignette + titles
-  // -------------------------------------------------------------------
   void _selectMediaAndSearch(MovieSuggestion media, {bool autoLaunchTorrents = true}) {
     final titles = media.allDistinctTitles;
     setState(() {
@@ -260,30 +251,28 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  /// Bypass matching and search torrents directly with user's input.
   void _skipMatchingAndSearchDirect() {
+    final l10n = AppL10n.of(context);
     final query = _movieCtrl.text.trim();
     if (query.isEmpty) {
-      _showSnack('Saisissez d\'abord un titre.');
+      _showSnack(l10n.t('enter_title_first'));
       return;
     }
     final manual = MovieSuggestion(
       titleFr: query,
       titleOriginal: query,
       mediaType: _mediaType,
-      source: 'Recherche directe',
+      source: l10n.t('direct_search'),
     );
     _selectMediaAndSearch(manual, autoLaunchTorrents: true);
   }
 
-  // -------------------------------------------------------------------
-  // Step 3: Execute torrent search with selected titles & optional season tag
-  // -------------------------------------------------------------------
   Future<void> _performTorrentSearch() async {
+    final l10n = AppL10n.of(context);
     final activeList = _activeSearchTitles.toList();
     final primaryQuery = activeList.isNotEmpty ? activeList.first : _movieCtrl.text.trim();
     if (primaryQuery.isEmpty) {
-      _showSnack('Sélectionnez au moins un titre à rechercher.');
+      _showSnack(l10n.t('select_one_title'));
       return;
     }
 
@@ -332,10 +321,11 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _saveForLater({MovieSuggestion? overrideMedia}) async {
+    final l10n = AppL10n.of(context);
     final m = overrideMedia ?? _selectedMedia;
     final titleFr = m?.titleFr ?? _movieCtrl.text.trim();
     if (titleFr.isEmpty) {
-      _showSnack('Saisissez d\'abord un titre.');
+      _showSnack(l10n.t('enter_title_first'));
       return;
     }
     final titleOrig = m?.titleEn ??
@@ -365,8 +355,8 @@ class _SearchScreenState extends State<SearchScreen> {
     widget.onDataChanged();
     _showSnack(
       added
-          ? '« $titleFr » sauvegardé dans « Plus tard » (avec sa vignette).'
-          : '« $titleFr » est déjà dans votre liste « Plus tard ».',
+          ? l10n.t('saved_watchlist', {'title': titleFr})
+          : l10n.t('already_watchlist', {'title': titleFr}),
     );
   }
 
@@ -454,14 +444,16 @@ class _SearchScreenState extends State<SearchScreen> {
       'ES' => 'Español',
       'MULTI' => 'MULTI',
       'DE' => 'Deutsch',
+      'NL' => 'Nederlands',
       'IT' => 'Italiano',
       'PT' => 'Português',
-      'JA' || 'JP' => 'Japonais',
+      'JA' || 'JP' => '日本語',
       _ => code.toUpperCase(),
     };
   }
 
   void _showSnack(String msg) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
@@ -479,19 +471,19 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _sendToSeedr(TorrentResult item) async {
+    final l10n = AppL10n.of(context);
     final seedr = SeedrService(storage: widget.storage);
     if (!seedr.isConnected) {
-      _showSnack('Connectez un compte dans l\'onglet Seedr pour envoyer des torrents.');
+      _showSnack(l10n.t('connect_seedr_first'));
       widget.onOpenSeedr?.call();
       return;
     }
     final magnet = item.magnetUrl;
     if (magnet == null || magnet.isEmpty) {
-      _showSnack('Utilisez « Bac à sable (.torrent) » pour envoyer ce fichier vers Seedr.');
+      _showSnack(l10n.t('use_sandbox_for_seedr'));
       return;
     }
 
-    // Always let the user choose the Seedr account after inspecting live available quota
     final chosen = await SeedrPickerDialog.show(
       context,
       storage: widget.storage,
@@ -501,16 +493,16 @@ class _SearchScreenState extends State<SearchScreen> {
     if (chosen == null || !mounted) return;
 
     try {
-      _showSnack('Envoi vers Seedr (${chosen.displayName}) en cours...');
+      _showSnack(l10n.t('sending_to_seedr', {'account': chosen.displayName}));
       final msg = await seedr.addMagnet(magnet, account: chosen);
       await widget.storage.setActiveSeedrAccount(chosen.id);
       widget.onSeedrTransferStarted?.call(chosen.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('☁️ Envoyé sur Seedr (${chosen.displayName}) : $msg'),
+          content: Text(l10n.t('sent_to_seedr', {'account': chosen.displayName, 'msg': msg})),
           action: widget.onOpenSeedr != null
-              ? SnackBarAction(label: 'Ouvrir Seedr', onPressed: widget.onOpenSeedr!)
+              ? SnackBarAction(label: l10n.t('open_seedr'), onPressed: widget.onOpenSeedr!)
               : null,
         ),
       );
@@ -527,12 +519,14 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _copyMagnet(String magnet) async {
+    final l10n = AppL10n.of(context);
     await Clipboard.setData(ClipboardData(text: magnet));
-    _showSnack('Lien Magnet copié dans le presse-papiers.');
+    _showSnack(l10n.t('magnet_copied'));
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final visibleResults = _filteredAndSortedResults;
     final canReset = _stage != _SearchStage.input ||
         _movieCtrl.text.isNotEmpty ||
@@ -546,7 +540,6 @@ class _SearchScreenState extends State<SearchScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Guided step indicator + "Nouvelle recherche" reset button
             Row(
               children: [
                 Expanded(
@@ -555,17 +548,17 @@ class _SearchScreenState extends State<SearchScreen> {
                     runSpacing: 6,
                     children: [
                       _stepPill(
-                        isSeries ? '1. Série' : '1. Film',
+                        isSeries ? l10n.t('step_series') : l10n.t('step_movie'),
                         active: _stage == _SearchStage.input,
                         done: _stage != _SearchStage.input,
                       ),
                       _stepPill(
-                        '2. Correspondance',
+                        l10n.t('step_match'),
                         active: _stage == _SearchStage.pickMedia,
                         done: _stage == _SearchStage.results,
                       ),
                       _stepPill(
-                        '3. Torrents',
+                        l10n.t('step_torrents'),
                         active: _stage == _SearchStage.results,
                         done: false,
                       ),
@@ -576,13 +569,12 @@ class _SearchScreenState extends State<SearchScreen> {
                   OutlinedButton.icon(
                     onPressed: _resetAllToZero,
                     icon: const Icon(Icons.refresh, size: 17),
-                    label: const Text('Nouvelle recherche'),
+                    label: Text(l10n.t('new_search')),
                   ),
               ],
             ),
             const SizedBox(height: 12),
 
-            // STEP 1: Clean title-only search card + Films / Séries toggle
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -597,13 +589,13 @@ class _SearchScreenState extends State<SearchScreen> {
                           selected: _mediaType == MediaType.movie,
                           onSelected: (_) => setState(() => _mediaType = MediaType.movie),
                           avatar: const Icon(Icons.movie_outlined, size: 17),
-                          label: const Text('Films'),
+                          label: Text(l10n.t('movies')),
                         ),
                         ChoiceChip(
                           selected: _mediaType == MediaType.series,
                           onSelected: (_) => setState(() => _mediaType = MediaType.series),
                           avatar: const Icon(Icons.tv_outlined, size: 17),
-                          label: const Text('Séries TV'),
+                          label: Text(l10n.t('tv_series')),
                         ),
                       ],
                     ),
@@ -615,10 +607,8 @@ class _SearchScreenState extends State<SearchScreen> {
                       onSubmitted: (_) => _identifyMedia(),
                       onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
-                        labelText: isSeries ? 'Nom de la série' : 'Nom du film',
-                        hintText: isSeries
-                            ? 'Ex : Severance, Stranger Things, La Casa de Papel...'
-                            : 'Ex : Les Évadés, Dune, Inception...',
+                        labelText: isSeries ? l10n.t('series_name') : l10n.t('movie_name'),
+                        hintText: isSeries ? l10n.t('series_hint') : l10n.t('movie_hint'),
                         prefixIcon: Icon(isSeries ? Icons.tv_outlined : Icons.movie_outlined),
                       ),
                     ),
@@ -637,15 +627,13 @@ class _SearchScreenState extends State<SearchScreen> {
                                 )
                               : const Icon(Icons.search),
                           label: Text(
-                            isSeries
-                                ? 'Identifier la série (AlloCiné / TVMaze)'
-                                : 'Identifier le film (AlloCiné / Bases)',
+                            isSeries ? l10n.t('identify_series') : l10n.t('identify_movie'),
                           ),
                         ),
                         OutlinedButton.icon(
                           onPressed: _searchingTorrents ? null : _skipMatchingAndSearchDirect,
                           icon: const Icon(Icons.fast_forward_outlined, size: 18),
-                          label: const Text('Passer (recherche directe)'),
+                          label: Text(l10n.t('skip_direct')),
                         ),
                       ],
                     ),
@@ -656,29 +644,27 @@ class _SearchScreenState extends State<SearchScreen> {
 
             const SizedBox(height: 14),
 
-            // STEP 2: Matching results (AlloCiné + TVMaze + Wikidata + IMDb)
-            if (_stage == _SearchStage.pickMedia) _buildStep2Suggestions(),
+            if (_stage == _SearchStage.pickMedia) _buildStep2Suggestions(l10n),
 
-            // STEP 3: Selected movie/series card (poster + titles + seasons/dates)
             if (_stage == _SearchStage.results && _selectedMedia != null) ...[
-              _buildSelectedMediaBanner(_selectedMedia!),
+              _buildSelectedMediaBanner(l10n, _selectedMedia!),
               const SizedBox(height: 12),
             ],
 
             if (_stage == _SearchStage.results && _results.isNotEmpty) ...[
-              _buildCategorizedFiltersCard(visibleResults.length),
+              _buildCategorizedFiltersCard(l10n, visibleResults.length),
               const SizedBox(height: 12),
             ],
 
             if (_searchingTorrents)
-              const Card(
+              Card(
                 child: Padding(
-                  padding: EdgeInsets.all(28),
+                  padding: const EdgeInsets.all(28),
                   child: Column(
                     children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 12),
-                      Text('Recherche des torrents sur les indexeurs sans pub...'),
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 12),
+                      Text(l10n.t('searching_torrents')),
                     ],
                   ),
                 ),
@@ -692,17 +678,15 @@ class _SearchScreenState extends State<SearchScreen> {
                       const Icon(Icons.movie_filter_outlined, size: 44, color: Color(0xFF94A3B8)),
                       const SizedBox(height: 10),
                       Text(
-                        isSeries
-                            ? 'Aucun torrent trouvé pour cette série'
-                            : 'Aucun torrent trouvé pour ce film',
+                        isSeries ? l10n.t('no_torrents_series') : l10n.t('no_torrents_movie'),
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        'Sauvegardez-le dans « Plus tard » pour y retourner facilement (sa vignette et ses dates seront conservées), ou lancez une nouvelle recherche.',
+                      Text(
+                        l10n.t('no_torrents_hint'),
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Color(0xFF94A3B8)),
+                        style: const TextStyle(color: Color(0xFF94A3B8)),
                       ),
                       const SizedBox(height: 16),
                       Wrap(
@@ -713,12 +697,12 @@ class _SearchScreenState extends State<SearchScreen> {
                           FilledButton.icon(
                             onPressed: _saveForLater,
                             icon: const Icon(Icons.bookmark_add_outlined),
-                            label: const Text('Sauvegarder pour plus tard'),
+                            label: Text(l10n.t('save_for_later')),
                           ),
                           OutlinedButton.icon(
                             onPressed: _resetAllToZero,
                             icon: const Icon(Icons.refresh),
-                            label: const Text('Nouvelle recherche'),
+                            label: Text(l10n.t('new_search')),
                           ),
                         ],
                       ),
@@ -737,8 +721,8 @@ class _SearchScreenState extends State<SearchScreen> {
                       const Icon(Icons.filter_alt_off_outlined, size: 40, color: Color(0xFF94A3B8)),
                       const SizedBox(height: 8),
                       Text(
-                        'Aucun des ${_results.length} torrent(s) ne correspond aux filtres actifs'
-                        '${_excludeCam ? ' (CAM/TS exclus par défaut)' : ''}.',
+                        '${l10n.t('no_filtered_results', {'count': '${_results.length}'})}'
+                        '${_excludeCam ? l10n.t('cam_excluded_note') : ''}.',
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 12),
@@ -750,12 +734,12 @@ class _SearchScreenState extends State<SearchScreen> {
                           FilledButton.icon(
                             onPressed: _clearAllTagFilters,
                             icon: const Icon(Icons.restart_alt),
-                            label: const Text('Tout afficher'),
+                            label: Text(l10n.t('show_all')),
                           ),
                           OutlinedButton.icon(
                             onPressed: _saveForLater,
                             icon: const Icon(Icons.bookmark_add_outlined),
-                            label: const Text('Sauvegarder pour plus tard'),
+                            label: Text(l10n.t('save_for_later')),
                           ),
                         ],
                       ),
@@ -771,7 +755,11 @@ class _SearchScreenState extends State<SearchScreen> {
                 runSpacing: 8,
                 children: [
                   Text(
-                    '${visibleResults.length} / ${_results.length} torrent(s) • ${_queriedIndexers.join(", ")}',
+                    l10n.t('results_summary', {
+                      'visible': '${visibleResults.length}',
+                      'total': '${_results.length}',
+                      'indexers': _queriedIndexers.join(', '),
+                    }),
                     style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                   ),
                   Row(
@@ -780,11 +768,23 @@ class _SearchScreenState extends State<SearchScreen> {
                       DropdownButton<_SortMode>(
                         value: _sortMode,
                         underline: const SizedBox.shrink(),
-                        items: const [
-                          DropdownMenuItem(value: _SortMode.seeders, child: Text('Tri : Seeders')),
-                          DropdownMenuItem(value: _SortMode.quality, child: Text('Tri : Qualité')),
-                          DropdownMenuItem(value: _SortMode.sizeDesc, child: Text('Tri : Taille ↓')),
-                          DropdownMenuItem(value: _SortMode.sizeAsc, child: Text('Tri : Taille ↑')),
+                        items: [
+                          DropdownMenuItem(
+                            value: _SortMode.seeders,
+                            child: Text(l10n.t('sort_seeders')),
+                          ),
+                          DropdownMenuItem(
+                            value: _SortMode.quality,
+                            child: Text(l10n.t('sort_quality')),
+                          ),
+                          DropdownMenuItem(
+                            value: _SortMode.sizeDesc,
+                            child: Text(l10n.t('sort_size_desc')),
+                          ),
+                          DropdownMenuItem(
+                            value: _SortMode.sizeAsc,
+                            child: Text(l10n.t('sort_size_asc')),
+                          ),
                         ],
                         onChanged: (v) {
                           if (v != null) setState(() => _sortMode = v);
@@ -794,14 +794,14 @@ class _SearchScreenState extends State<SearchScreen> {
                       TextButton.icon(
                         onPressed: _saveForLater,
                         icon: const Icon(Icons.bookmark_add_outlined, size: 18),
-                        label: const Text('Plus tard'),
+                        label: Text(l10n.t('later_short')),
                       ),
                     ],
                   ),
                 ],
               ),
               const SizedBox(height: 8),
-              ...visibleResults.map(_buildResultCard),
+              ...visibleResults.map((item) => _buildResultCard(l10n, item)),
             ],
           ],
         ),
@@ -827,7 +827,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildStep2Suggestions() {
+  Widget _buildStep2Suggestions(AppL10n l10n) {
     if (_loadingTitles) {
       return Card(
         child: Padding(
@@ -838,8 +838,8 @@ class _SearchScreenState extends State<SearchScreen> {
               const SizedBox(height: 12),
               Text(
                 _mediaType == MediaType.series
-                    ? 'Recherche de la série (AlloCiné, TVMaze, Wikidata)...'
-                    : 'Recherche du film (AlloCiné, Wikidata, IMDb)...',
+                    ? l10n.t('loading_series_db')
+                    : l10n.t('loading_movie_db'),
               ),
             ],
           ),
@@ -855,15 +855,15 @@ class _SearchScreenState extends State<SearchScreen> {
             children: [
               const Icon(Icons.search_off_outlined, size: 42, color: Color(0xFF94A3B8)),
               const SizedBox(height: 8),
-              const Text(
-                'Aucune fiche correspondante trouvée',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+              Text(
+                l10n.t('no_match_found'),
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Vous pouvez lancer directement la recherche de torrents avec votre texte ou sauvegarder pour plus tard.',
-                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              Text(
+                l10n.t('no_match_hint'),
+                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 14),
@@ -875,12 +875,12 @@ class _SearchScreenState extends State<SearchScreen> {
                   FilledButton.icon(
                     onPressed: _skipMatchingAndSearchDirect,
                     icon: const Icon(Icons.search),
-                    label: const Text('Chercher les torrents quand même'),
+                    label: Text(l10n.t('search_anyway')),
                   ),
                   OutlinedButton.icon(
                     onPressed: _saveForLater,
                     icon: const Icon(Icons.bookmark_add_outlined),
-                    label: const Text('Sauvegarder pour plus tard'),
+                    label: Text(l10n.t('save_for_later')),
                   ),
                 ],
               ),
@@ -898,31 +898,31 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             Text(
               _mediaType == MediaType.series
-                  ? 'Étape 2 — Sélectionnez la bonne série (dates des saisons incluses) :'
-                  : 'Étape 2 — Sélectionnez le bon film pour lancer la recherche de torrents :',
+                  ? l10n.t('step2_series_prompt')
+                  : l10n.t('step2_movie_prompt'),
               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
             ),
             const SizedBox(height: 10),
-            ..._suggestions.map(_buildSuggestionCard),
+            ..._suggestions.map((s) => _buildSuggestionCard(l10n, s)),
             const Divider(height: 20),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Text(
-                  'Vous ne trouvez pas la bonne fiche ?',
-                  style: TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+                Text(
+                  l10n.t('cant_find_match'),
+                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
                 ),
                 OutlinedButton.icon(
                   onPressed: _skipMatchingAndSearchDirect,
                   icon: const Icon(Icons.fast_forward_outlined, size: 16),
-                  label: const Text('Passer et chercher avec mon texte'),
+                  label: Text(l10n.t('skip_search_text')),
                 ),
                 TextButton.icon(
                   onPressed: _saveForLater,
                   icon: const Icon(Icons.bookmark_add_outlined, size: 16),
-                  label: const Text('Sauvegarder pour plus tard'),
+                  label: Text(l10n.t('save_for_later')),
                 ),
               ],
             ),
@@ -984,7 +984,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildSeriesBadges(MovieSuggestion s) {
+  Widget _buildSeriesBadges(AppL10n l10n, MovieSuggestion s) {
     if (s.mediaType != MediaType.series) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: 6),
@@ -994,7 +994,7 @@ class _SearchScreenState extends State<SearchScreen> {
         children: [
           if (s.seasonCount != null)
             _pill(
-              '📺 ${s.seasonCount} saison${s.seasonCount! > 1 ? 's' : ''}',
+              '📺 ${s.seasonCount} ${s.seasonCount! > 1 ? l10n.t('season_plural') : l10n.t('season_singular')}',
               const Color(0xFF1E3A8A),
               const Color(0xFFBFDBFE),
             ),
@@ -1019,7 +1019,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildSuggestionCard(MovieSuggestion s) {
+  Widget _buildSuggestionCard(AppL10n l10n, MovieSuggestion s) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
@@ -1086,7 +1086,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                   ],
                 ),
-                _buildSeriesBadges(s),
+                _buildSeriesBadges(l10n, s),
                 if (s.synopsis != null && s.synopsis!.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(
@@ -1104,16 +1104,16 @@ class _SearchScreenState extends State<SearchScreen> {
                     FilledButton.icon(
                       onPressed: () => _selectMediaAndSearch(s, autoLaunchTorrents: true),
                       icon: const Icon(Icons.search, size: 17),
-                      label: const Text('Sélectionner & chercher'),
+                      label: Text(l10n.t('select_and_search')),
                     ),
                     OutlinedButton(
                       onPressed: () => _selectMediaAndSearch(s, autoLaunchTorrents: false),
-                      child: const Text('Choisir titres / saison'),
+                      child: Text(l10n.t('choose_titles_season')),
                     ),
                     TextButton.icon(
                       onPressed: () => _saveForLater(overrideMedia: s),
                       icon: const Icon(Icons.bookmark_add_outlined, size: 16),
-                      label: const Text('Plus tard'),
+                      label: Text(l10n.t('later_short')),
                     ),
                   ],
                 ),
@@ -1125,7 +1125,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildSelectedMediaBanner(MovieSuggestion media) {
+  Widget _buildSelectedMediaBanner(AppL10n l10n, MovieSuggestion media) {
     final allTitles = media.allDistinctTitles;
     String? flagCodeForTitle(String t) {
       final low = t.toLowerCase();
@@ -1163,17 +1163,17 @@ class _SearchScreenState extends State<SearchScreen> {
                           onPressed: () => setState(() => _stage = _SearchStage.pickMedia),
                           child: Text(
                             media.mediaType == MediaType.series
-                                ? 'Changer de série'
-                                : 'Changer de film',
+                                ? l10n.t('change_series')
+                                : l10n.t('change_movie'),
                           ),
                         ),
                     ],
                   ),
-                  _buildSeriesBadges(media),
+                  _buildSeriesBadges(l10n, media),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Titres utilisés pour la recherche torrent :',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  Text(
+                    l10n.t('titles_used'),
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                   ),
                   const SizedBox(height: 6),
                   Wrap(
@@ -1207,12 +1207,11 @@ class _SearchScreenState extends State<SearchScreen> {
                     }).toList(),
                   ),
 
-                  // Quick Season selector for TV Series
                   if (media.mediaType == MediaType.series) ...[
                     const SizedBox(height: 8),
-                    const Text(
-                      'Cibler une saison :',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                    Text(
+                      l10n.t('target_season'),
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                     ),
                     const SizedBox(height: 6),
                     Wrap(
@@ -1222,7 +1221,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         ChoiceChip(
                           selected: _selectedSeasonTag == null,
                           onSelected: (_) => setState(() => _selectedSeasonTag = null),
-                          label: const Text('Toutes', style: TextStyle(fontSize: 12)),
+                          label: Text(l10n.t('all_seasons'), style: const TextStyle(fontSize: 12)),
                         ),
                         for (var s = 1; s <= (maxSeasons > 0 ? maxSeasons : 5); s++)
                           ChoiceChip(
@@ -1238,7 +1237,10 @@ class _SearchScreenState extends State<SearchScreen> {
                         ChoiceChip(
                           selected: _selectedSeasonTag == 'Complete',
                           onSelected: (_) => setState(() => _selectedSeasonTag = 'Complete'),
-                          label: const Text('Intégrale', style: TextStyle(fontSize: 12)),
+                          label: Text(
+                            l10n.t('complete_series'),
+                            style: const TextStyle(fontSize: 12),
+                          ),
                         ),
                       ],
                     ),
@@ -1254,14 +1256,14 @@ class _SearchScreenState extends State<SearchScreen> {
                         icon: const Icon(Icons.search, size: 17),
                         label: Text(
                           _hasSearchedTorrents
-                              ? 'Relancer la recherche torrent'
-                              : 'Lancer la recherche torrent',
+                              ? l10n.t('rerun_torrent_search')
+                              : l10n.t('launch_torrent_search'),
                         ),
                       ),
                       OutlinedButton.icon(
                         onPressed: _saveForLater,
                         icon: const Icon(Icons.bookmark_add_outlined, size: 17),
-                        label: const Text('Sauvegarder pour plus tard'),
+                        label: Text(l10n.t('save_for_later')),
                       ),
                     ],
                   ),
@@ -1274,8 +1276,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  /// Quick filters organized cleanly in horizontal rows grouped by category.
-  Widget _buildCategorizedFiltersCard(int visibleCount) {
+  Widget _buildCategorizedFiltersCard(AppL10n l10n, int visibleCount) {
     Widget categoryRow(String title, List<Widget> chips) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -1315,7 +1316,7 @@ class _SearchScreenState extends State<SearchScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '🏷️ Filtres rapides ($visibleCount affiché(s))',
+                  l10n.t('quick_filters', {'count': '$visibleCount'}),
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
                 ),
                 if (_hasAnyTagFilters)
@@ -1327,16 +1328,19 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                     onPressed: _clearAllTagFilters,
                     icon: const Icon(Icons.close, size: 15),
-                    label: const Text('Tout afficher', style: TextStyle(fontSize: 12)),
+                    label: Text(l10n.t('show_all'), style: const TextStyle(fontSize: 12)),
                   ),
               ],
             ),
             const SizedBox(height: 10),
-            categoryRow('Langues', [
+            categoryRow(l10n.t('cat_languages'), [
               for (final entry in const [
                 ('FR', 'Français'),
                 ('EN', 'English'),
                 ('ES', 'Español'),
+                ('DE', 'Deutsch'),
+                ('NL', 'Nederlands'),
+                ('IT', 'Italiano'),
                 ('MULTI', 'MULTI'),
               ])
                 FilterChip(
@@ -1358,27 +1362,27 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                 ),
             ]),
-            categoryRow('Disponibilité', [
+            categoryRow(l10n.t('cat_availability'), [
               FilterChip(
                 selected: _onlyActiveSeeders,
                 onSelected: (v) => setState(() => _onlyActiveSeeders = v),
-                label: const Text('▲ Seeders actifs', style: TextStyle(fontSize: 12)),
+                label: Text(l10n.t('active_seeders'), style: const TextStyle(fontSize: 12)),
               ),
               FilterChip(
                 selected: _minTenSeeders,
                 onSelected: (v) => setState(() => _minTenSeeders = v),
-                label: const Text('🔥 ≥ 10 seeders', style: TextStyle(fontSize: 12)),
+                label: Text(l10n.t('min_10_seeders'), style: const TextStyle(fontSize: 12)),
               ),
             ]),
-            categoryRow('Taille max', [
+            categoryRow(l10n.t('cat_max_size'), [
               for (final gb in [2, 5, 10])
                 FilterChip(
                   selected: _maxSizeGb == gb,
                   onSelected: (v) => setState(() => _maxSizeGb = v ? gb : null),
-                  label: Text('< $gb Go', style: const TextStyle(fontSize: 12)),
+                  label: Text('< $gb GB', style: const TextStyle(fontSize: 12)),
                 ),
             ]),
-            categoryRow('Résolution', [
+            categoryRow(l10n.t('cat_resolution'), [
               for (final res in ['4K', '1080p', '720p'])
                 FilterChip(
                   selected: _resolutionFilters.contains(res),
@@ -1392,7 +1396,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   label: Text(res, style: const TextStyle(fontSize: 12)),
                 ),
             ]),
-            categoryRow('Source & Codec', [
+            categoryRow(l10n.t('cat_source_codec'), [
               for (final fmt in [
                 'BluRay',
                 'WEB-DL',
@@ -1414,11 +1418,11 @@ class _SearchScreenState extends State<SearchScreen> {
                   label: Text(fmt, style: const TextStyle(fontSize: 12)),
                 ),
             ]),
-            categoryRow('Qualité', [
+            categoryRow(l10n.t('cat_quality'), [
               FilterChip(
                 selected: _excludeCam,
                 onSelected: (v) => setState(() => _excludeCam = v),
-                label: const Text('🚫 Sans CAM/TS', style: TextStyle(fontSize: 12)),
+                label: Text(l10n.t('exclude_cam'), style: const TextStyle(fontSize: 12)),
               ),
             ]),
           ],
@@ -1427,7 +1431,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildResultCard(TorrentResult item) {
+  Widget _buildResultCard(AppL10n l10n, TorrentResult item) {
     final isBlocked = item.preScanStatus == SafetyStatus.blocked;
     final is4k = item.quality.toLowerCase().contains('4k') || item.quality.contains('2160p');
 
@@ -1468,7 +1472,11 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
                 _pill(item.indexer, const Color(0xFF1E293B), const Color(0xFF94A3B8)),
                 if (isBlocked)
-                  _pill('⛔ Suspect', const Color(0xFF7F1D1D), const Color(0xFFFCA5A5)),
+                  _pill(
+                    l10n.t('suspicious_badge'),
+                    const Color(0xFF7F1D1D),
+                    const Color(0xFFFCA5A5),
+                  ),
               ],
             ),
             const SizedBox(height: 10),
@@ -1476,9 +1484,12 @@ class _SearchScreenState extends State<SearchScreen> {
               spacing: 16,
               runSpacing: 6,
               children: [
-                Text('Taille : ${item.sizeHuman}', style: const TextStyle(fontSize: 13)),
                 Text(
-                  '▲ Seeders : ${item.seeders}',
+                  l10n.t('size_label', {'size': item.sizeHuman}),
+                  style: const TextStyle(fontSize: 13),
+                ),
+                Text(
+                  l10n.t('seeders_label', {'n': '${item.seeders}'}),
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF22C55E),
@@ -1486,7 +1497,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                 ),
                 Text(
-                  '▼ Leechers : ${item.leechers}',
+                  l10n.t('leechers_label', {'n': '${item.leechers}'}),
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFFF59E0B),
@@ -1514,24 +1525,24 @@ class _SearchScreenState extends State<SearchScreen> {
                   FilledButton.icon(
                     onPressed: isBlocked ? null : () => _openSandbox(item),
                     icon: const Icon(Icons.verified_user_outlined, size: 18),
-                    label: const Text('Bac à sable (.torrent)'),
+                    label: Text(l10n.t('sandbox_btn')),
                   ),
                 if (item.magnetUrl != null)
                   OutlinedButton.icon(
                     onPressed: isBlocked ? null : () => _sendToSeedr(item),
                     icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-                    label: const Text('Envoyer vers Seedr'),
+                    label: Text(l10n.t('send_to_seedr')),
                   ),
                 OutlinedButton.icon(
                   onPressed: () => _openNfo(item),
                   icon: const Icon(Icons.description_outlined, size: 18),
-                  label: const Text('NFO / Détails'),
+                  label: Text(l10n.t('nfo_btn')),
                 ),
                 if (item.magnetUrl != null)
                   OutlinedButton.icon(
                     onPressed: () => _copyMagnet(item.magnetUrl!),
                     icon: const Icon(Icons.link, size: 18),
-                    label: const Text('Copier Magnet'),
+                    label: Text(l10n.t('copy_magnet')),
                   ),
               ],
             ),

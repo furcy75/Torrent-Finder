@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:safetorrent/l10n/app_l10n.dart';
 import 'package:safetorrent/models/app_settings.dart';
 import 'package:safetorrent/models/safety_report.dart';
 import 'package:safetorrent/models/torrent_result.dart';
@@ -66,12 +67,13 @@ class _SandboxDialogState extends State<SandboxDialog> {
 
   String _safeFileName(String raw) {
     var clean = raw.replaceAll(RegExp(r'[^A-Za-z0-9._ -]+'), '_').trim();
-    if (clean.isEmpty) clean = 'film_verifie';
+    if (clean.isEmpty) clean = 'verified_video';
     if (!clean.toLowerCase().endsWith('.torrent')) clean = '$clean.torrent';
     return clean.length > 100 ? '${clean.substring(0, 92)}.torrent' : clean;
   }
 
   Future<void> _exportSanitizedTorrent(Uint8List bytes, String rawName) async {
+    final l10n = AppL10n.of(context);
     setState(() => _saving = true);
     try {
       final fileName = _safeFileName(rawName);
@@ -85,7 +87,7 @@ class _SandboxDialogState extends State<SandboxDialog> {
         );
         if (mounted) {
           setState(() {
-            _savedMessage = 'Fichier .torrent vérifié prêt à ouvrir ou enregistrer : $fileName';
+            _savedMessage = l10n.t('sandbox_ready_mobile', {'name': fileName});
           });
         }
       } else {
@@ -94,13 +96,13 @@ class _SandboxDialogState extends State<SandboxDialog> {
         await file.writeAsBytes(bytes, flush: true);
         if (mounted) {
           setState(() {
-            _savedMessage = 'Enregistré dans : ${file.path}';
+            _savedMessage = l10n.t('sandbox_saved_desktop', {'path': file.path});
           });
         }
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _savedMessage = 'Erreur lors de l\'enregistrement : $e');
+        setState(() => _savedMessage = l10n.t('sandbox_save_error', {'err': '$e'}));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -114,6 +116,7 @@ class _SandboxDialogState extends State<SandboxDialog> {
   ) async {
     final storage = widget.storage;
     if (storage == null || storage.seedrAccounts.isEmpty) return;
+    final l10n = AppL10n.of(context);
 
     final chosen = await SeedrPickerDialog.show(
       context,
@@ -134,11 +137,16 @@ class _SandboxDialogState extends State<SandboxDialog> {
       await storage.setActiveSeedrAccount(chosen.id);
       widget.onSeedrTransferStarted?.call(chosen.id);
       if (!mounted) return;
-      setState(() => _savedMessage = '☁️ Envoyé sur Seedr (${chosen.displayName}) : $msg');
+      setState(
+        () => _savedMessage = l10n.t('sent_to_seedr', {
+          'account': chosen.displayName,
+          'msg': msg,
+        }),
+      );
       widget.onSentToSeedr?.call();
     } catch (e) {
       if (!mounted) return;
-      setState(() => _savedMessage = 'Erreur Seedr : $e');
+      setState(() => _savedMessage = '$e');
     } finally {
       if (mounted) setState(() => _sendingSeedr = false);
     }
@@ -146,32 +154,30 @@ class _SandboxDialogState extends State<SandboxDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final res = _result;
     final report = res?.report;
     final seedrReady = (widget.storage?.seedrAccounts.isNotEmpty ?? false);
 
     return AlertDialog(
       backgroundColor: const Color(0xFF111C33),
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.shield_outlined, color: Color(0xFF22C55E)),
-          SizedBox(width: 8),
-          Expanded(child: Text('Inspection Bac à Sable')),
+          const Icon(Icons.shield_outlined, color: Color(0xFF22C55E)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(l10n.t('sandbox_title'))),
         ],
       ),
       content: SizedBox(
         width: 560,
         child: res == null
-            ? const Column(
+            ? Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  SizedBox(height: 12),
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text(
-                    'Téléchargement en mémoire dans l\'Isolate bac à sable et analyse anti-malware des fichiers internes...',
-                    textAlign: TextAlign.center,
-                  ),
+                  const SizedBox(height: 12),
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(l10n.t('sandbox_loading'), textAlign: TextAlign.center),
                 ],
               )
             : SingleChildScrollView(
@@ -179,16 +185,16 @@ class _SandboxDialogState extends State<SandboxDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _statusBanner(report!),
+                    _statusBanner(l10n, report!),
                     const SizedBox(height: 8),
                     Text(
-                      'Isolation : ${report.sandboxMode}',
+                      l10n.t('sandbox_isolation', {'mode': report.sandboxMode}),
                       style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                     ),
                     if (report.infoHash != null) ...[
                       const SizedBox(height: 4),
                       Text(
-                        'SHA-1 : ${report.infoHash} • ${report.fileCount} fichier(s) (${report.videoFileCount} vidéo) • ${ReleaseParser.formatSize(report.totalSizeBytes)}',
+                        'SHA-1 : ${report.infoHash} • ${report.fileCount} (${report.videoFileCount} video) • ${ReleaseParser.formatSize(report.totalSizeBytes)}',
                         style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                       ),
                     ],
@@ -223,15 +229,17 @@ class _SandboxDialogState extends State<SandboxDialog> {
                     if (report.sanitizedFieldsRemoved.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Text(
-                        'Métadonnées externes supprimées : ${report.sanitizedFieldsRemoved.join(", ")}',
+                        l10n.t('sandbox_removed_meta', {
+                          'fields': report.sanitizedFieldsRemoved.join(', '),
+                        }),
                         style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                       ),
                     ],
                     if (report.files.isNotEmpty) ...[
                       const SizedBox(height: 12),
-                      const Text(
-                        'Fichiers contenus dans le .torrent :',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                      Text(
+                        l10n.t('sandbox_files_header'),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                       ),
                       const SizedBox(height: 6),
                       ...report.files.map(
@@ -285,7 +293,7 @@ class _SandboxDialogState extends State<SandboxDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Fermer'),
+          child: Text(l10n.t('close')),
         ),
         if (report != null && report.safeToDownload && res?.sanitizedBytes != null) ...[
           if (seedrReady)
@@ -304,7 +312,7 @@ class _SandboxDialogState extends State<SandboxDialog> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.cloud_upload_outlined, size: 17),
-              label: const Text('Envoyer vers Seedr'),
+              label: Text(l10n.t('send_to_seedr')),
             ),
           FilledButton.icon(
             onPressed: _saving
@@ -313,8 +321,8 @@ class _SandboxDialogState extends State<SandboxDialog> {
             icon: const Icon(Icons.download_done),
             label: Text(
               Platform.isAndroid || Platform.isIOS
-                  ? 'Ouvrir / Enregistrer .torrent'
-                  : 'Enregistrer .torrent vérifié',
+                  ? l10n.t('sandbox_save_mobile')
+                  : l10n.t('sandbox_save_desktop'),
             ),
           ),
         ],
@@ -322,25 +330,25 @@ class _SandboxDialogState extends State<SandboxDialog> {
     );
   }
 
-  Widget _statusBanner(SafetyReport report) {
+  Widget _statusBanner(AppL10n l10n, SafetyReport report) {
     final (label, bg, fg) = switch (report.status) {
       SafetyStatus.safe => (
-          '✅ FIABLE — Aucun exécutable / script détecté',
+          l10n.t('sandbox_safe'),
           const Color(0xFF14532D),
           const Color(0xFF86EFAC),
         ),
       SafetyStatus.warning => (
-          '⚠️ PRUDENCE — Vérifiez les avertissements',
+          l10n.t('sandbox_warning'),
           const Color(0xFF78350F),
           const Color(0xFFFCD34D),
         ),
       SafetyStatus.blocked => (
-          '⛔ BLOQUÉ PAR LE BAC À SABLE',
+          l10n.t('sandbox_blocked'),
           const Color(0xFF7F1D1D),
           const Color(0xFFFCA5A5),
         ),
       SafetyStatus.unverified => (
-          'ℹ️ .torrent indisponible sur les caches (utilisez Magnet ou Seedr)',
+          l10n.t('sandbox_unverified'),
           const Color(0xFF1E293B),
           const Color(0xFFCBD5E1),
         ),
