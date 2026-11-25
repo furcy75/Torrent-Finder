@@ -1118,7 +1118,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   FilterChip(
                     selected: _maxSizeGb == gb,
                     onSelected: (v) => setState(() => _maxSizeGb = v ? gb : null),
-                    label: Text('< $gb Go', style: TextStyle(fontSize: 12)),
+                    label: Text('< $gb Go', style: const TextStyle(fontSize: 12)),
                   ),
                 // Resolution tags
                 for (final res in ['4K', '1080p', '720p'])
