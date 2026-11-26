@@ -32,11 +32,11 @@ void main() {
     await storage.addOrUpdateSeedrAccount(
       const SeedrSession(
         id: 'acc_1',
-        label: 'Principal',
+        label: 'Main',
         accessToken: 'tok_1',
-        deviceCode: 'dev_1',
-        authMode: 'device',
+        refreshToken: 'ref_1',
         username: 'user_1',
+        email: 'user1@example.com',
         lastSpaceUsed: 1500000000,
         lastSpaceMax: 4500000000,
       ),
@@ -44,10 +44,9 @@ void main() {
     await storage.addOrUpdateSeedrAccount(
       const SeedrSession(
         id: 'acc_2',
-        label: 'Compte 2',
+        label: 'Account 2',
         accessToken: 'tok_2',
         refreshToken: 'ref_2',
-        authMode: 'password',
         email: 'user2@example.com',
         lastSpaceUsed: 3800000000,
         lastSpaceMax: 4000000000,
@@ -58,15 +57,15 @@ void main() {
     expect(service.accounts.length, equals(2));
     expect(storage.activeSeedrAccount?.id, equals('acc_2'));
 
-    await storage.renameSeedrAccount('acc_2', 'Secondaire');
+    await storage.renameSeedrAccount('acc_2', 'Secondary');
     await storage.setActiveSeedrAccount('acc_1');
 
     final reloaded = LocalStorageService(overrideDirectory: tmpDir);
     await reloaded.load();
     expect(reloaded.seedrAccounts.length, equals(2));
     expect(reloaded.activeSeedrAccount?.id, equals('acc_1'));
-    expect(reloaded.activeSeedrAccount?.deviceCode, equals('dev_1'));
-    expect(reloaded.seedrAccountById('acc_2')?.label, equals('Secondaire'));
+    expect(reloaded.activeSeedrAccount?.refreshToken, equals('ref_1'));
+    expect(reloaded.seedrAccountById('acc_2')?.label, equals('Secondary'));
 
     await SeedrService(storage: reloaded).disconnectAccount('acc_1');
     expect(reloaded.seedrAccounts.length, equals(1));
@@ -82,7 +81,6 @@ void main() {
       jsonEncode({
         'seedrSession': {
           'accessToken': 'legacy_tok',
-          'authMode': 'device',
           'username': 'legacy_user',
         },
       }),
@@ -98,14 +96,13 @@ void main() {
   test('SeedrAccountQuota checks free space fit and tracks active downloads', () {
     const acc = SeedrSession(
       id: 'acc_1',
-      label: 'Principal',
+      label: 'Main',
       accessToken: 'tok',
-      authMode: 'device',
     );
     const idleQuota = SeedrAccountQuota(
       account: acc,
-      spaceUsed: 1500000000, // 1.5 GB used
-      spaceMax: 4000000000, // 4.0 GB max -> 2.5 GB free
+      spaceUsed: 1500000000,
+      spaceMax: 4000000000,
       activeDownloadsCount: 0,
     );
     const busyQuota = SeedrAccountQuota(

@@ -49,24 +49,23 @@ Grab the latest ready-to-use binaries from [**GitHub Releases**](https://github.
 
 ## ✨ Key Features
 
-### 🎬 Guided Movie & TV Series Workflow
-1. **Clean Title Input**: toggle **Movies** or **TV Series** and enter only the title.
-2. **Multilingual Matching**: simultaneously queries **AlloCiné**, **Wikidata**, **TVMaze**, and **IMDb**, displaying the **poster thumbnail** and localized titles with **vector country flags**.
-3. **TV Series Tracking**: displays **season count**, **status**, **next season / next episode release date**, and a quick season selector (`S01`, `S02`..., `Complete`).
-4. **One-Click Reset** to start a fresh search from scratch.
+### 🎬 Separate Info Lookup & Editable Torrent Search
+1. **Movie / TV Series Info Lookup *(optional)***: look up a title on **AlloCiné**, **Wikidata**, **TVMaze**, and **IMDb** to view its **poster**, localized titles with **vector country flags**, and TV series season release dates — or click **Skip this step**.
+2. **Editable Torrent Search**: click any localized title (or season tag) to populate the **Torrent Search** box, then freely edit or append extra keywords (`FRENCH`, `1080p`, `S02E01`, year...) before running the search.
+3. **One-Click Reset** to start a fresh search from scratch.
 
-### 🏷️ Categorized Quick Filters & Secure NFO Viewer
+### 🏷️ Quick Filters, Result Language Flags & Secure NFO Viewer
 - **Row-grouped quick filters**:
-  - **Languages**: French, English, Spanish, German, Dutch, Italian, MULTI *(with vector flags)*
   - **Availability**: `▲ Active seeders`, `🔥 ≥ 10 seeders`
   - **Max size**: `< 2 GB`, `< 5 GB`, `< 10 GB`
   - **Resolution**: `4K`, `1080p`, `720p`
   - **Source & Codec**: `BluRay`, `WEB-DL`, `WEBRip`, `HDRip`, `H.264 / x264`, `x265`, `HDR`
   - **Quality**: `🚫 Exclude CAM/TS` *(enabled by default)*
+- **Language Flags in Results**: whenever languages (`FR`, `EN`, `ES`, `DE`, `NL`, `IT`, `MULTI`...) are present in torrent metadata, crisp vector country flags are displayed directly on each result card.
 - **Plain-text NFO / Details Viewer**: displays NFO/MediaInfo safely in monospace text with zero HTML/JS execution.
 
-### ☁️ Live Seedr.cc Integration (Multi-Account & Discreet Alerts)
-- **Multiple Seedr Accounts**: connect multiple named accounts via **Device Code OAuth** (`seedr.cc/devices`, auto-refreshing with zero password stored) or **Email & Password** (only the OAuth token is saved locally — passwords are never stored).
+### ☁️ Live Seedr.cc Integration (One or More Accounts & Discreet Alerts)
+- **One or More Seedr Accounts**: sign in with **Email & Password** (only the OAuth token is saved locally — passwords are never stored).
 - **Quota & Active Transfer Picker**: before sending a Magnet link or sanitized `.torrent` file, **Torrent Seeder** checks each account's live free space and indicates whether a **download is currently in progress**, letting you **manually choose** which account to use.
 - **Discreet Download Complete Popup**: displays a clean privacy-friendly alert (**"File downloaded"**, without revealing any filename or details) as soon as a Seedr transfer finishes.
 - **Live Account Management**: switch accounts, view storage quota, monitor active transfers, browse folders/files, open direct HTTPS downloads, download folder ZIPs, copy direct URLs (VLC), and delete items in one tap.

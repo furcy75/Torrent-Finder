@@ -47,9 +47,9 @@ Download de nieuwste versie via [**GitHub Releases**](https://github.com/furcy75
 
 ## ✨ Belangrijkste functies
 
-- **Begeleide Film- & Seriezoektocht**: herkenning via AlloCiné, Wikidata, TVMaze en IMDb inclusief poster, meertalige titels en releasedatums van volgende seizoenen.
-- **Snelfilters & veilige NFO-viewer**: talen met vectorvlaggen, actieve seeders, max. grootte, resolutie, codec (`H.264 / x264`, `x265`, `HDR`), CAM/TS standaard uitgesloten en platte-tekst NFO-viewer.
-- **Seedr.cc Multi-Account-integratie**: inloggen met **Apparaatcode** of **E-mail & Wachtwoord**, handmatige accountkeuze met **vrije ruimte + melding van actieve downloads**, en een **discrete melding «Bestand gedownload»** (zonder bestandsdetails) zodra een transfer klaar is.
+- **Gescheiden Info-zoekopdracht & bewerkbare Torrent-zoekopdracht**: zoek eerst Film-/Serie-info (optioneel — AlloCiné, Wikidata, TVMaze, IMDb), klik op een titel in de gewenste taal en pas de zoekopdracht vrij aan.
+- **Snelfilters, taalvlaggen bij resultaten & veilige NFO-viewer**: actieve seeders, max. grootte, resolutie, codec (`H.264 / x264`, `x265`, `HDR`), CAM/TS standaard uitgesloten, vectorvlaggen wanneer talen in resultaten worden herkend en platte-tekst NFO-viewer.
+- **Seedr.cc-integratie (een of meer accounts)**: inloggen met **E-mail & Wachtwoord** (alleen het OAuth-token wordt lokaal opgeslagen, nooit het wachtwoord), handmatige accountkeuze met **vrije ruimte + melding van actieve downloads**, en een **discrete melding «Bestand gedownload»** (zonder bestandsdetails) zodra een transfer klaar is.
 - **10 ingebouwde bronnen + Torznab**: YTS, APIBay, Knaben, TorrentCSV, SolidTorrents, EZTV, BitSearch, Nyaa, LimeTorrents, Internet Archive + Jackett/Prowlarr.
 
 ---

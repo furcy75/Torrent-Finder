@@ -47,9 +47,9 @@ Descarga la última versión desde [**GitHub Releases**](https://github.com/furc
 
 ## ✨ Funciones principales
 
-- **Búsqueda guiada de Películas y Series**: identificación en AlloCiné, Wikidata, TVMaze e IMDb con portada, títulos multilingües y fechas de próximas temporadas.
-- **Filtros rápidos y Visor NFO seguro**: idiomas con banderas vectoriales, seeders activos, tamaño máximo, resolución, códec (`H.264 / x264`, `x265`, `HDR`), exclusión CAM/TS por defecto y visor NFO en texto plano.
-- **Integración Seedr.cc multi-cuenta**: acceso por **Código de Dispositivo** o **Email y Contraseña**, selector manual con **cuota libre e indicador de descarga en curso**, y **aviso discreto «Archivo descargado»** (sin detalles del archivo) al finalizar una descarga.
+- **Búsqueda de información y Búsqueda Torrent separadas**: busca primero la ficha de Película/Serie (opcional — AlloCiné, Wikidata, TVMaze, IMDb), selecciona un título en el idioma deseado para rellenar el campo **Búsqueda Torrent** y edítalo libremente antes de buscar.
+- **Filtros rápidos, banderas en resultados y Visor NFO seguro**: seeders activos, tamaño máximo, resolución, códec (`H.264 / x264`, `x265`, `HDR`), exclusión CAM/TS por defecto, banderas vectoriales cuando se detectan idiomas en los resultados y visor NFO en texto plano.
+- **Integración Seedr.cc (una o más cuentas)**: acceso con **Email y Contraseña** (solo se guarda el token OAuth, nunca la contraseña), selector manual con **cuota libre e indicador de descarga en curso**, y **aviso discreto «Archivo descargado»** (sin detalles del archivo) al finalizar una descarga.
 - **10 fuentes integradas + Torznab**: YTS, APIBay, Knaben, TorrentCSV, SolidTorrents, EZTV, BitSearch, Nyaa, LimeTorrents, Internet Archive + Jackett/Prowlarr.
 
 ---

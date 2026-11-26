@@ -46,6 +46,18 @@ class ReleaseParser {
     r'\b(english|eng|vo|usa|uk)\b',
     caseSensitive: false,
   );
+  static final RegExp _langDe = RegExp(
+    r'\b(german|deutsch|ger|deu|dl[\s._-]?ger)\b',
+    caseSensitive: false,
+  );
+  static final RegExp _langNl = RegExp(
+    r'\b(dutch|nederlands|nl[\s._-]?subs?|nld|vlaams)\b',
+    caseSensitive: false,
+  );
+  static final RegExp _langIt = RegExp(
+    r'\b(italian|italiano|ita|sub[\s._-]?ita)\b',
+    caseSensitive: false,
+  );
   static final RegExp _langMulti = RegExp(
     r'\b(multi|dual[\s._-]?audio)\b',
     caseSensitive: false,
@@ -127,6 +139,9 @@ class ReleaseParser {
     if (_langMulti.hasMatch(title)) found.add('MULTI');
     if (_langFr.hasMatch(title)) found.add('FR');
     if (_langEs.hasMatch(title)) found.add('ES');
+    if (_langDe.hasMatch(title)) found.add('DE');
+    if (_langNl.hasMatch(title)) found.add('NL');
+    if (_langIt.hasMatch(title)) found.add('IT');
     if (_langEn.hasMatch(title)) found.add('EN');
     if (found.isEmpty && defaultLang != null && defaultLang.isNotEmpty) {
       found.add(defaultLang.toUpperCase());

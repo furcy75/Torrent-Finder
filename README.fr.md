@@ -49,9 +49,9 @@ Récupérez directement la dernière version prête à l'emploi depuis [**GitHub
 
 ## ✨ Fonctionnalités principales
 
-- **Parcours guidé Films & Séries TV** : identification sur AlloCiné, Wikidata, TVMaze et IMDb avec affiche, titres multilingues, suivi des saisons et date de la prochaine saison.
-- **Filtres rapides par catégories & Visionneuse NFO** : langues avec drapeaux vectoriels, seeders actifs, taille max, résolution, codec (`H.264 / x264`, `x265`, `HDR`), exclusion CAM/TS par défaut, NFO texte brut sécurisé.
-- **Intégration Seedr.cc multi-comptes** : connexion par **Code Appareil** ou **Email & Mot de passe**, sélecteur manuel de compte avec **quota libre + indicateur de téléchargement en cours**, et **pop-up discret « Fichier téléchargé »** (sans détail de fichier) dès qu'un transfert se termine.
+- **Recherche d'informations & Recherche Torrent séparées** : recherchez d'abord la fiche Film/Série (optionnel — AlloCiné, Wikidata, TVMaze, IMDb), cliquez sur un titre dans la langue souhaitée pour remplir le champ **Recherche Torrent**, puis modifiez librement votre requête avant de lancer la recherche.
+- **Filtres rapides, drapeaux dans les résultats & Visionneuse NFO** : seeders actifs, taille max, résolution, codec (`H.264 / x264`, `x265`, `HDR`), exclusion CAM/TS par défaut, affichage de drapeaux vectoriels lorsque les langues sont détectées dans les résultats, et NFO texte brut sécurisé.
+- **Intégration Seedr.cc (un ou plusieurs comptes)** : connexion par **Email & Mot de passe** (seul le jeton OAuth est conservé localement, jamais le mot de passe), sélecteur manuel de compte avec **quota libre + indicateur de téléchargement en cours**, et **pop-up discret « Fichier téléchargé »** (sans détail de fichier) dès qu'un transfert se termine.
 - **10 sources intégrées + Torznab** : YTS, APIBay, Knaben, TorrentCSV, SolidTorrents, EZTV, BitSearch, Nyaa, LimeTorrents, Internet Archive + Jackett/Prowlarr.
 
 ---

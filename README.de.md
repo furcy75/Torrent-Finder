@@ -47,9 +47,9 @@ Laden Sie die aktuelle Version direkt über [**GitHub Releases**](https://github
 
 ## ✨ Hauptfunktionen
 
-- **Geführte Film- & Seriensuche**: Erkennung über AlloCiné, Wikidata, TVMaze und IMDb inkl. Cover, mehrsprachiger Titel und Erscheinungstermine kommender Staffeln.
-- **Kategorisierte Schnellfilter & NFO-Viewer**: Sprachen mit Vektor-Flaggen, aktive Seeder, Maximalgröße, Auflösung, Codec (`H.264 / x264`, `x265`, `HDR`), CAM/TS standardmäßig ausgeblendet und sicherer Klartext-NFO-Viewer.
-- **Seedr.cc Multi-Account-Integration**: Anmeldung via **Gerätecode** oder **E-Mail & Passwort**, manuelle Kontoauswahl mit **freiem Speicher & Anzeige laufender Downloads**, sowie ein **diskretes Pop-up „Datei heruntergeladen“** (ohne Dateidetails) nach Abschluss.
+- **Getrennte Info-Suche & bearbeitbare Torrent-Suche**: suchen Sie zuerst Film-/Serien-Infos (optional — AlloCiné, Wikidata, TVMaze, IMDb), klicken Sie auf einen Titel in der gewünschten Sprache und passen Sie die Torrent-Suchanfrage frei an.
+- **Schnellfilter, Sprachflaggen in Ergebnissen & NFO-Viewer**: aktive Seeder, Maximalgröße, Auflösung, Codec (`H.264 / x264`, `x265`, `HDR`), CAM/TS standardmäßig ausgeblendet, Vektor-Flaggen für erkannte Sprachen in den Ergebnissen und sicherer Klartext-NFO-Viewer.
+- **Seedr.cc-Integration (ein oder mehrere Konten)**: Anmeldung mit **E-Mail & Passwort** (nur das OAuth-Token wird gespeichert, niemals das Passwort), manuelle Kontoauswahl mit **freiem Speicher & Anzeige laufender Downloads**, sowie ein **diskretes Pop-up „Datei heruntergeladen“** (ohne Dateidetails) nach Abschluss.
 - **10 integrierte Quellen + Torznab**: YTS, APIBay, Knaben, TorrentCSV, SolidTorrents, EZTV, BitSearch, Nyaa, LimeTorrents, Internet Archive + Jackett/Prowlarr.
 
 ---

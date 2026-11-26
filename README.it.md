@@ -47,9 +47,9 @@ Scarica l'ultima versione da [**GitHub Releases**](https://github.com/furcy75/To
 
 ## ✨ Funzionalità principali
 
-- **Ricerca guidata Film e Serie TV**: identificazione tramite AlloCiné, Wikidata, TVMaze e IMDb con locandina, titoli multilingue e date delle prossime stagioni.
-- **Filtri rapidi e Visualizzatore NFO sicuro**: lingue con bandiere vettoriali, seeder attivi, dimensione massima, risoluzione, codec (`H.264 / x264`, `x265`, `HDR`), esclusione CAM/TS predefinita e NFO in testo semplice.
-- **Integrazione Seedr.cc multi-account**: accesso con **Codice Dispositivo** o **Email e Password**, selettore manuale con **spazio libero + indicatore di download in corso**, e **avviso discreto «File scaricato»** (senza dettagli del file) al termine di un trasferimento.
+- **Ricerca informazioni e Ricerca Torrent separate**: cerca prima la scheda Film/Serie (opzionale — AlloCiné, Wikidata, TVMaze, IMDb), clicca su un titolo nella lingua desiderata per compilare la **Ricerca Torrent** e modificala liberamente prima di avviare la ricerca.
+- **Filtri rapidi, bandiere nei risultati e Visualizzatore NFO sicuro**: seeder attivi, dimensione massima, risoluzione, codec (`H.264 / x264`, `x265`, `HDR`), esclusione CAM/TS predefinita, bandiere vettoriali quando le lingue sono rilevate nei risultati e NFO in testo semplice.
+- **Integrazione Seedr.cc (uno o più account)**: accesso con **Email e Password** (viene salvato solo il token OAuth, mai la password), selettore manuale con **spazio libero + indicatore di download in corso**, e **avviso discreto «File scaricato»** (senza dettagli del file) al termine di un trasferimento.
 - **10 fonti integrate + Torznab**: YTS, APIBay, Knaben, TorrentCSV, SolidTorrents, EZTV, BitSearch, Nyaa, LimeTorrents, Internet Archive + Jackett/Prowlarr.
 
 ---

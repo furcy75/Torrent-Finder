@@ -15,21 +15,15 @@ class SeedrApiException implements Exception {
   String toString() => message;
 }
 
-/// Complete Seedr.cc API client supporting multiple Seedr accounts and BOTH
-/// authentication flows:
-/// 1. Device Code OAuth (`seedr.cc/devices`, auto-refreshable via `device_code`, zero password stored)
-/// 2. Email + Password OAuth (`oauth_test/token.php`, auto-refreshable via `refresh_token`, password never saved)
-///
-/// NOTE: Seedr's `/oauth_test/resource.php` routes RPC calls using query
-/// parameters (`?access_token=...&func=...`), NOT POST body fields — putting
-/// `func` only in the POST body produces HTTP 404.
+/// Complete Seedr.cc API client supporting one or more Seedr accounts via
+/// Email + Password OAuth (`oauth_test/token.php`, auto-refreshable via
+/// `refresh_token`, password NEVER persisted on disk).
 class SeedrService {
   SeedrService({required this.storage});
 
   final LocalStorageService storage;
 
   static const Duration _timeout = Duration(seconds: 15);
-  static const String _deviceClientId = 'seedr_xbmc';
   static const String _passwordClientId = 'seedr_chrome';
   static const Map<String, String> _headers = {
     'User-Agent': 'TorrentSeeder/2.0 (Standalone)',
@@ -52,74 +46,7 @@ class SeedrService {
   }
 
   // -------------------------------------------------------------------
-  // Auth Mode 1: Device Code OAuth (Recommended — no password required)
-  // -------------------------------------------------------------------
-  Future<SeedrDeviceCode> requestDeviceCode() async {
-    final uri = Uri.https('www.seedr.cc', '/api/device/code', {
-      'client_id': _deviceClientId,
-    });
-    final resp = await http.get(uri, headers: _headers).timeout(_timeout);
-    if (resp.statusCode != 200) {
-      throw SeedrApiException(
-        'Impossible de générer un code appareil Seedr (HTTP ${resp.statusCode}).',
-      );
-    }
-    final data = jsonDecode(resp.body) as Map<String, dynamic>;
-    final deviceCode = data['device_code']?.toString() ?? '';
-    final userCode = data['user_code']?.toString() ?? '';
-    if (deviceCode.isEmpty || userCode.isEmpty) {
-      throw SeedrApiException('Réponse Seedr incomplète lors de la demande de code.');
-    }
-    return SeedrDeviceCode(
-      deviceCode: deviceCode,
-      userCode: userCode,
-      verificationUrl: (data['verification_url'] ?? 'https://www.seedr.cc/devices').toString(),
-      intervalSeconds: (data['interval'] as num?)?.toInt() ?? 5,
-      expiresInSeconds: (data['expires_in'] as num?)?.toInt() ?? 1800,
-    );
-  }
-
-  /// Poll Seedr once to check if the user authorized `deviceCode` on `seedr.cc/devices`.
-  /// Returns `null` while authorization is still pending.
-  Future<SeedrSession?> pollDeviceAuthorization(
-    String deviceCode, {
-    String label = '',
-  }) async {
-    final uri = Uri.https('www.seedr.cc', '/api/device/authorize', {
-      'device_code': deviceCode,
-      'client_id': _deviceClientId,
-    });
-    final resp = await http.get(uri, headers: _headers).timeout(_timeout);
-    final data = _safeJsonMap(resp.body);
-    final err = data['error']?.toString();
-    if (err == 'authorization_pending' || err == 'slow_down') {
-      return null;
-    }
-    final token = data['access_token']?.toString();
-    if (token != null && token.isNotEmpty) {
-      final cleanLabel = label.trim().isNotEmpty
-          ? label.trim()
-          : 'Compte ${storage.seedrAccounts.length + 1}';
-      var newSession = SeedrSession(
-        id: 'seedr_${DateTime.now().microsecondsSinceEpoch}',
-        label: cleanLabel,
-        accessToken: token,
-        refreshToken: data['refresh_token']?.toString(),
-        deviceCode: deviceCode,
-        authMode: 'device',
-      );
-      newSession = await _enrichAccountProfile(newSession, customLabelProvided: label.trim().isNotEmpty);
-      await storage.addOrUpdateSeedrAccount(newSession, makeActive: true);
-      return newSession;
-    }
-    if (err != null && err.isNotEmpty) {
-      throw SeedrApiException('Autorisation Seedr refusée ou expirée ($err).');
-    }
-    return null;
-  }
-
-  // -------------------------------------------------------------------
-  // Auth Mode 2: Email + Password OAuth (Password never written to disk)
+  // Email + Password OAuth (Password never written to disk)
   // -------------------------------------------------------------------
   Future<SeedrSession> loginWithPassword({
     required String email,
@@ -146,8 +73,8 @@ class SeedrService {
     if (resp.statusCode != 200 || token == null || token.isEmpty) {
       final errDesc = data['error_description']?.toString() ??
           data['error']?.toString() ??
-          'Identifiants invalides';
-      throw SeedrApiException('Échec connexion Seedr : $errDesc');
+          'Invalid credentials';
+      throw SeedrApiException('Seedr: $errDesc');
     }
 
     final cleanLabel = label.trim().isNotEmpty
@@ -158,56 +85,40 @@ class SeedrService {
       label: cleanLabel,
       accessToken: token,
       refreshToken: data['refresh_token']?.toString(),
-      authMode: 'password',
       email: email.trim(),
     );
-    newSession = await _enrichAccountProfile(newSession, customLabelProvided: label.trim().isNotEmpty);
+    newSession = await _enrichAccountProfile(
+      newSession,
+      customLabelProvided: label.trim().isNotEmpty,
+    );
     await storage.addOrUpdateSeedrAccount(newSession, makeActive: true);
     return newSession;
   }
 
   Future<SeedrSession?> _tryRefreshAccount(SeedrSession account) async {
+    if ((account.refreshToken ?? '').isEmpty) return null;
     try {
-      // Case 1: Refresh token (Email/Password flow)
-      if ((account.refreshToken ?? '').isNotEmpty) {
-        final uri = Uri.https('www.seedr.cc', '/oauth_test/token.php');
-        final resp = await http
-            .post(
-              uri,
-              headers: _headers,
-              body: {
-                'grant_type': 'refresh_token',
-                'client_id': _passwordClientId,
-                'refresh_token': account.refreshToken!,
-              },
-            )
-            .timeout(_timeout);
-        final data = _safeJsonMap(resp.body);
-        final newToken = data['access_token']?.toString();
-        if (resp.statusCode == 200 && newToken != null && newToken.isNotEmpty) {
-          final updated = account.copyWith(
-            accessToken: newToken,
-            refreshToken: data['refresh_token']?.toString() ?? account.refreshToken,
-          );
-          await storage.addOrUpdateSeedrAccount(updated, makeActive: false);
-          return updated;
-        }
-      }
-
-      // Case 2: Device Code re-authorization (Device flow)
-      if ((account.deviceCode ?? '').isNotEmpty) {
-        final uri = Uri.https('www.seedr.cc', '/api/device/authorize', {
-          'device_code': account.deviceCode!,
-          'client_id': _deviceClientId,
-        });
-        final resp = await http.get(uri, headers: _headers).timeout(_timeout);
-        final data = _safeJsonMap(resp.body);
-        final newToken = data['access_token']?.toString();
-        if (resp.statusCode == 200 && newToken != null && newToken.isNotEmpty) {
-          final updated = account.copyWith(accessToken: newToken);
-          await storage.addOrUpdateSeedrAccount(updated, makeActive: false);
-          return updated;
-        }
+      final uri = Uri.https('www.seedr.cc', '/oauth_test/token.php');
+      final resp = await http
+          .post(
+            uri,
+            headers: _headers,
+            body: {
+              'grant_type': 'refresh_token',
+              'client_id': _passwordClientId,
+              'refresh_token': account.refreshToken!,
+            },
+          )
+          .timeout(_timeout);
+      final data = _safeJsonMap(resp.body);
+      final newToken = data['access_token']?.toString();
+      if (resp.statusCode == 200 && newToken != null && newToken.isNotEmpty) {
+        final updated = account.copyWith(
+          accessToken: newToken,
+          refreshToken: data['refresh_token']?.toString() ?? account.refreshToken,
+        );
+        await storage.addOrUpdateSeedrAccount(updated, makeActive: false);
+        return updated;
       }
     } catch (_) {
       // ignore
@@ -245,7 +156,6 @@ class SeedrService {
       // ignore
     }
 
-    // Fetch initial quota snapshot so the account immediately displays its free space
     try {
       final memUri = buildResourceUri(accessToken: enriched.accessToken, func: 'get_memory_bandwidth');
       final resp = await http.get(memUri, headers: _headers).timeout(_timeout);
@@ -269,7 +179,6 @@ class SeedrService {
   Future<SeedrAccountQuota> fetchAccountQuota(SeedrSession account) async {
     try {
       return await _withAutoRefresh(account, (token, current) async {
-        // list_contents(0) returns space_used, space_max, AND active torrents in one call
         final folderUri = buildResourceUri(accessToken: token, func: 'list_contents');
         final folderResp = await http
             .post(
@@ -375,14 +284,14 @@ class SeedrService {
       final data = _checkAuthAndParse(resp);
       final result = data['result'];
       if (result == true || result == 'true' || data['user_torrent_id'] != null) {
-        return data['title']?.toString() ?? 'Torrent ajouté sur Seedr !';
+        return data['title']?.toString() ?? 'OK';
       }
-      final err = data['error']?.toString() ?? data['result']?.toString() ?? 'Erreur Seedr';
+      final err = data['error']?.toString() ?? data['result']?.toString() ?? 'Seedr error';
       throw SeedrApiException(_translateSeedrError(err));
     });
   }
 
-  /// Upload a sanitized `.torrent` file straight from SafeTorrent's Sandbox to Seedr!
+  /// Upload a sanitized `.torrent` file straight from the Sandbox to Seedr.
   Future<String> addTorrentBytes(
     Uint8List torrentBytes,
     String fileName, {
@@ -408,14 +317,13 @@ class SeedrService {
       final data = _checkAuthAndParse(resp);
       final result = data['result'];
       if (result == true || result == 'true' || data['user_torrent_id'] != null) {
-        return data['title']?.toString() ?? 'Fichier .torrent vérifié envoyé sur Seedr !';
+        return data['title']?.toString() ?? 'OK';
       }
-      final err = data['error']?.toString() ?? data['result']?.toString() ?? 'Erreur Seedr';
+      final err = data['error']?.toString() ?? data['result']?.toString() ?? 'Seedr error';
       throw SeedrApiException(_translateSeedrError(err));
     });
   }
 
-  /// Fetch direct HTTPS CDN download URL for a file stored in Seedr.
   Future<String> fetchFileDownloadUrl(
     String folderFileId, {
     SeedrSession? account,
@@ -427,21 +335,18 @@ class SeedrService {
           .post(
             uri,
             headers: _headers,
-            body: {
-              'folder_file_id': folderFileId,
-            },
+            body: {'folder_file_id': folderFileId},
           )
           .timeout(_timeout);
       final data = _checkAuthAndParse(resp);
       final url = data['url']?.toString();
       if (url == null || url.isEmpty) {
-        throw SeedrApiException('Impossible de récupérer le lien de téléchargement Seedr.');
+        throw SeedrApiException('Unable to retrieve Seedr download link.');
       }
       return url;
     });
   }
 
-  /// Create a ZIP download link for a full folder in Seedr.
   Future<String> createFolderZipUrl(
     String folderId, {
     SeedrSession? account,
@@ -456,21 +361,18 @@ class SeedrService {
           .post(
             uri,
             headers: _headers,
-            body: {
-              'archive_arr': archiveArr,
-            },
+            body: {'archive_arr': archiveArr},
           )
           .timeout(_timeout);
       final data = _checkAuthAndParse(resp);
       final url = data['archive_url']?.toString() ?? data['url']?.toString();
       if (url == null || url.isEmpty) {
-        throw SeedrApiException('Impossible de générer l\'archive ZIP Seedr.');
+        throw SeedrApiException('Unable to create Seedr ZIP archive.');
       }
       return url;
     });
   }
 
-  /// Delete a file (`file`), folder (`folder`), or active transfer (`torrent`) from Seedr.
   Future<void> deleteItem({
     required String type,
     required String id,
@@ -486,9 +388,7 @@ class SeedrService {
           .post(
             uri,
             headers: _headers,
-            body: {
-              'delete_arr': deleteArr,
-            },
+            body: {'delete_arr': deleteArr},
           )
           .timeout(_timeout);
       _checkAuthAndParse(resp);
@@ -502,7 +402,7 @@ class SeedrService {
     final resolved = account ?? storage.activeSeedrAccount;
     if (resolved == null || !resolved.isValid) {
       throw SeedrApiException(
-        'Aucun compte Seedr connecté. Ouvrez l\'onglet Seedr pour vous connecter.',
+        'No Seedr account connected.',
         authExpired: true,
       );
     }
@@ -535,7 +435,7 @@ class SeedrService {
         err.contains('invalid_token') ||
         err.contains('access_denied')) {
       throw SeedrApiException(
-        'Session Seedr expirée — reconnectez ce compte dans l\'onglet Seedr.',
+        'Seedr session expired — please sign in again.',
         authExpired: true,
       );
     }
@@ -543,7 +443,7 @@ class SeedrService {
       throw SeedrApiException(
         data['error_description']?.toString() ??
             data['error']?.toString() ??
-            'Erreur Seedr HTTP ${resp.statusCode}',
+            'Seedr HTTP ${resp.statusCode}',
       );
     }
     return data;
@@ -562,14 +462,11 @@ class SeedrService {
   static String _translateSeedrError(String raw) {
     final low = raw.toLowerCase();
     if (low.contains('not_enough_space')) {
-      return 'Espace insuffisant sur ce compte Seedr — choisissez un autre compte ou libérez de l\'espace.';
+      return 'Seedr: not_enough_space';
     }
     if (low.contains('queue_full')) {
-      return 'File d\'attente Seedr pleine — attendez la fin d\'un transfert en cours.';
+      return 'Seedr: queue_full';
     }
-    if (low.contains('parsing_error') || low.contains('invalid')) {
-      return 'Lien Magnet ou fichier .torrent refusé par Seedr ($raw).';
-    }
-    return 'Seedr : $raw';
+    return 'Seedr: $raw';
   }
 }

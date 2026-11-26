@@ -35,17 +35,16 @@ class SeedrScreen extends StatefulWidget {
 class _SeedrScreenState extends State<SeedrScreen> {
   late final SeedrService _seedr = SeedrService(storage: widget.storage);
 
+  // Add-account / Email + Password login UI state
   bool _showAddAccountForm = false;
-  bool _useDeviceFlow = true;
   final _labelCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _obscurePass = true;
   bool _authBusy = false;
   String? _authError;
-  SeedrDeviceCode? _pendingDeviceCode;
-  Timer? _devicePollTimer;
 
+  // Live account explorer state
   SeedrFolderContents? _contents;
   final List<(String id, String name)> _folderStack = [];
   bool _loadingFolder = false;
@@ -74,7 +73,6 @@ class _SeedrScreenState extends State<SeedrScreen> {
 
   @override
   void dispose() {
-    _devicePollTimer?.cancel();
     _liveTransferTimer?.cancel();
     _labelCtrl.dispose();
     _emailCtrl.dispose();
@@ -105,12 +103,10 @@ class _SeedrScreenState extends State<SeedrScreen> {
       await _loadFolder(folderId: _currentFolderId);
       return;
     }
-    _devicePollTimer?.cancel();
     await widget.storage.setActiveSeedrAccount(accountId);
     if (!mounted) return;
     setState(() {
       _showAddAccountForm = false;
-      _pendingDeviceCode = null;
       _authError = null;
       _contents = null;
       _folderStack.clear();
@@ -121,73 +117,7 @@ class _SeedrScreenState extends State<SeedrScreen> {
   }
 
   // -------------------------------------------------------------------
-  // Auth Mode 1: Device Code Flow
-  // -------------------------------------------------------------------
-  Future<void> _startDeviceFlow() async {
-    _devicePollTimer?.cancel();
-    setState(() {
-      _authBusy = true;
-      _authError = null;
-      _pendingDeviceCode = null;
-    });
-    try {
-      final code = await _seedr.requestDeviceCode();
-      if (!mounted) return;
-      setState(() {
-        _authBusy = false;
-        _pendingDeviceCode = code;
-      });
-      final interval = Duration(seconds: code.intervalSeconds.clamp(4, 15));
-      _devicePollTimer = Timer.periodic(interval, (_) => _checkDeviceApproval(silent: true));
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _authBusy = false;
-        _authError = e.toString();
-      });
-    }
-  }
-
-  Future<void> _checkDeviceApproval({bool silent = false}) async {
-    final pending = _pendingDeviceCode;
-    if (pending == null) return;
-    final l10n = AppL10n.of(context);
-    try {
-      final session = await _seedr.pollDeviceAuthorization(
-        pending.deviceCode,
-        label: _labelCtrl.text,
-      );
-      if (!mounted) return;
-      if (session != null) {
-        _devicePollTimer?.cancel();
-        _devicePollTimer = null;
-        _labelCtrl.clear();
-        setState(() {
-          _pendingDeviceCode = null;
-          _authError = null;
-          _showAddAccountForm = false;
-          _contents = null;
-          _folderStack.clear();
-        });
-        widget.onSessionChanged();
-        _showSnack(l10n.t('account_connected', {'name': session.displayName}));
-        await _loadFolder();
-      } else if (!silent) {
-        _showSnack(l10n.t('waiting_approval'));
-      }
-    } catch (e) {
-      _devicePollTimer?.cancel();
-      _devicePollTimer = null;
-      if (!mounted) return;
-      setState(() {
-        _pendingDeviceCode = null;
-        _authError = e.toString();
-      });
-    }
-  }
-
-  // -------------------------------------------------------------------
-  // Auth Mode 2: Email + Password Flow
+  // Email + Password OAuth Flow (Password never saved on disk)
   // -------------------------------------------------------------------
   Future<void> _loginWithPassword() async {
     final l10n = AppL10n.of(context);
@@ -492,10 +422,8 @@ class _SeedrScreenState extends State<SeedrScreen> {
                 const Spacer(),
                 TextButton.icon(
                   onPressed: () {
-                    _devicePollTimer?.cancel();
                     setState(() {
                       _showAddAccountForm = true;
-                      _pendingDeviceCode = null;
                       _authError = null;
                     });
                   },
@@ -533,7 +461,6 @@ class _SeedrScreenState extends State<SeedrScreen> {
   }
 
   Widget _buildLoginView(AppL10n l10n) {
-    final pending = _pendingDeviceCode;
     final hasExistingAccounts = _seedr.isConnected;
 
     return ListView(
@@ -570,10 +497,8 @@ class _SeedrScreenState extends State<SeedrScreen> {
                     if (hasExistingAccounts)
                       TextButton.icon(
                         onPressed: () {
-                          _devicePollTimer?.cancel();
                           setState(() {
                             _showAddAccountForm = false;
-                            _pendingDeviceCode = null;
                             _authError = null;
                           });
                         },
@@ -590,160 +515,46 @@ class _SeedrScreenState extends State<SeedrScreen> {
                     prefixIcon: const Icon(Icons.badge_outlined),
                   ),
                 ),
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    ChoiceChip(
-                      selected: _useDeviceFlow,
-                      onSelected: (_) => setState(() {
-                        _useDeviceFlow = true;
-                        _authError = null;
-                      }),
-                      avatar: const Icon(Icons.qr_code_2, size: 17),
-                      label: Text(l10n.t('auth_device')),
-                    ),
-                    ChoiceChip(
-                      selected: !_useDeviceFlow,
-                      onSelected: (_) => setState(() {
-                        _useDeviceFlow = false;
-                        _authError = null;
-                      }),
-                      avatar: const Icon(Icons.mail_outline, size: 17),
-                      label: Text(l10n.t('auth_password')),
-                    ),
-                  ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: l10n.t('seedr_email'),
+                    prefixIcon: const Icon(Icons.email_outlined),
+                  ),
                 ),
-                const SizedBox(height: 16),
-                if (_useDeviceFlow) ...[
-                  Text(
-                    l10n.t('auth_device_desc'),
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                  ),
-                  const SizedBox(height: 14),
-                  if (pending == null)
-                    FilledButton.icon(
-                      onPressed: _authBusy ? null : _startDeviceFlow,
-                      icon: _authBusy
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.key_outlined),
-                      label: Text(l10n.t('generate_device_code')),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0B1120),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF38BDF8)),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            l10n.t('enter_code_on_seedr'),
-                            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                          ),
-                          const SizedBox(height: 8),
-                          SelectableText(
-                            pending.userCode,
-                            style: const TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 4,
-                              color: Color(0xFF38BDF8),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            alignment: WrapAlignment.center,
-                            children: [
-                              OutlinedButton.icon(
-                                onPressed: () async {
-                                  await Clipboard.setData(ClipboardData(text: pending.userCode));
-                                  _showSnack(l10n.t('code_copied', {'code': pending.userCode}));
-                                },
-                                icon: const Icon(Icons.copy, size: 16),
-                                label: Text(l10n.t('copy_code')),
-                              ),
-                              FilledButton.icon(
-                                onPressed: () => _openExternalUrl(pending.verificationUrl),
-                                icon: const Icon(Icons.open_in_new, size: 16),
-                                label: Text(l10n.t('open_seedr_devices')),
-                              ),
-                              TextButton.icon(
-                                onPressed: () => _checkDeviceApproval(silent: false),
-                                icon: const Icon(Icons.check_circle_outline, size: 16),
-                                label: Text(l10n.t('check_now')),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                l10n.t('auto_checking'),
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                ] else ...[
-                  TextField(
-                    controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      labelText: l10n.t('seedr_email'),
-                      prefixIcon: const Icon(Icons.email_outlined),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _passCtrl,
+                  obscureText: _obscurePass,
+                  onSubmitted: (_) => _loginWithPassword(),
+                  decoration: InputDecoration(
+                    labelText: l10n.t('seedr_password'),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      onPressed: () => setState(() => _obscurePass = !_obscurePass),
+                      icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _passCtrl,
-                    obscureText: _obscurePass,
-                    onSubmitted: (_) => _loginWithPassword(),
-                    decoration: InputDecoration(
-                      labelText: l10n.t('seedr_password'),
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        onPressed: () => setState(() => _obscurePass = !_obscurePass),
-                        icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.t('password_never_saved'),
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: _authBusy ? null : _loginWithPassword,
-                    icon: _authBusy
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.login),
-                    label: Text(l10n.t('login_seedr')),
-                  ),
-                ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.t('password_never_saved'),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  onPressed: _authBusy ? null : _loginWithPassword,
+                  icon: _authBusy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.login),
+                  label: Text(l10n.t('login_seedr')),
+                ),
                 if (_authError != null) ...[
                   const SizedBox(height: 12),
                   Container(
@@ -806,11 +617,9 @@ class _SeedrScreenState extends State<SeedrScreen> {
                             Text(
                               [
                                 if (s.username != null && s.username != s.displayName) s.username!,
+                                if (s.email != null && s.email != s.displayName) s.email!,
                                 if (s.packageName != null)
                                   l10n.t('offer_label', {'plan': s.packageName!}),
-                                s.authMode == 'device'
-                                    ? l10n.t('mode_device')
-                                    : l10n.t('mode_email'),
                               ].join(' • '),
                               style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                             ),

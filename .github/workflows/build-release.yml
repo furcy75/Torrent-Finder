@@ -54,7 +54,6 @@ jobs:
           flutter create --platforms=android --org com.safetorrent --project-name safetorrent .
           python3 -m pip install --quiet pillow
           python3 installer/generate_icons.py --platform android
-          python3 -c 'from pathlib import Path; m = Path("android/app/src/main/AndroidManifest.xml"); t = m.read_text(encoding="utf-8"); t = t.replace("<application", "    <uses-permission android:name=\"android.permission.INTERNET\" />\n    <application", 1) if "android.permission.INTERNET" not in t else t; m.write_text(t.replace("android:label=\"safetorrent\"", "android:label=\"Torrent Seeder\""), encoding="utf-8")'
 
       - name: Build Release APK
         run: |

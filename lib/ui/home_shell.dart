@@ -312,17 +312,33 @@ class _HomeShellState extends State<HomeShell> {
         titleSpacing: 16,
         title: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.asset(
-                'assets/icon/app_icon.png',
-                width: 30,
-                height: 30,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.shield_outlined,
-                  color: Color(0xFF22C55E),
-                  size: 26,
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xAA38BDF8), width: 1.2),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x4438BDF8),
+                    blurRadius: 6,
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Transform.scale(
+                scale: 1.32,
+                child: Image.asset(
+                  'assets/icon/app_icon.png',
+                  width: 36,
+                  height: 36,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.shield_outlined,
+                    color: Color(0xFF22C55E),
+                    size: 26,
+                  ),
                 ),
               ),
             ),

@@ -17,8 +17,6 @@ import 'package:safetorrent/ui/widgets/country_flag.dart';
 
 enum _SortMode { seeders, quality, sizeDesc, sizeAsc }
 
-enum _SearchStage { input, pickMedia, results }
-
 class SearchScreen extends StatefulWidget {
   const SearchScreen({
     super.key,
@@ -42,21 +40,25 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  final _movieCtrl = TextEditingController();
-  final _movieFocus = FocusNode();
+  // Area 1: Movie / TV Series Information Lookup (optional)
+  final _infoCtrl = TextEditingController();
+  final _infoFocus = FocusNode();
+
+  // Area 2: Editable Torrent Search Query (always editable!)
+  final _torrentQueryCtrl = TextEditingController();
+  final _torrentQueryFocus = FocusNode();
 
   final _allocineService = AllocineService();
   final _indexersService = IndexersService();
 
   MediaType _mediaType = MediaType.movie;
-  _SearchStage _stage = _SearchStage.input;
-
+  bool _skippedInfoStep = false;
+  bool _loadingInfo = false;
+  bool _hasLookedUpInfo = false;
+  List<MovieSuggestion> _suggestions = [];
   MovieSuggestion? _selectedMedia;
-  final Set<String> _activeSearchTitles = {};
-  String? _selectedSeasonTag;
 
-  // Quick filter tags organized by category rows (CAM/TS excluded by default)
-  final Set<String> _langResultFilters = {};
+  // Quick filter tags (NO language filter; CAM/TS excluded by default)
   bool _onlyActiveSeeders = false;
   bool _minTenSeeders = false;
   bool _excludeCam = true;
@@ -65,11 +67,8 @@ class _SearchScreenState extends State<SearchScreen> {
   final Set<String> _formatFilters = {};
 
   _SortMode _sortMode = _SortMode.seeders;
-  bool _loadingTitles = false;
   bool _searchingTorrents = false;
   bool _hasSearchedTorrents = false;
-
-  List<MovieSuggestion> _suggestions = [];
   List<TorrentResult> _results = [];
   List<String> _queriedIndexers = [];
   String? _activeWatchlistId;
@@ -83,15 +82,13 @@ class _SearchScreenState extends State<SearchScreen> {
       final req = widget.pendingRequest!;
       final media = req.movie;
       _mediaType = media.mediaType;
-      _movieCtrl.text = media.titleFr;
+      _infoCtrl.text = media.titleFr;
       _selectedMedia = media;
-      _selectedSeasonTag = null;
-      _activeSearchTitles
-        ..clear()
-        ..addAll(media.allDistinctTitles);
-      _activeWatchlistId = req.watchlistId;
+      _skippedInfoStep = false;
       _suggestions = [];
-      _stage = _SearchStage.results;
+      _hasLookedUpInfo = true;
+      _activeWatchlistId = req.watchlistId;
+      _setTorrentQueryFromTitle(media.titleFr, year: media.year);
       _performTorrentSearch();
 
       if (media.posterUrl == null || media.posterUrl!.isEmpty) {
@@ -148,26 +145,27 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
-    _movieCtrl.dispose();
-    _movieFocus.dispose();
+    _infoCtrl.dispose();
+    _infoFocus.dispose();
+    _torrentQueryCtrl.dispose();
+    _torrentQueryFocus.dispose();
     super.dispose();
   }
 
   void _resetAllToZero() {
     setState(() {
-      _movieCtrl.clear();
-      _stage = _SearchStage.input;
-      _selectedMedia = null;
-      _selectedSeasonTag = null;
-      _activeSearchTitles.clear();
+      _infoCtrl.clear();
+      _torrentQueryCtrl.clear();
+      _skippedInfoStep = false;
+      _loadingInfo = false;
+      _hasLookedUpInfo = false;
       _suggestions = [];
+      _selectedMedia = null;
       _results = [];
       _queriedIndexers = [];
       _activeWatchlistId = null;
-      _loadingTitles = false;
       _searchingTorrents = false;
       _hasSearchedTorrents = false;
-      _langResultFilters.clear();
       _onlyActiveSeeders = false;
       _minTenSeeders = false;
       _excludeCam = true;
@@ -176,11 +174,10 @@ class _SearchScreenState extends State<SearchScreen> {
       _formatFilters.clear();
       _sortMode = _SortMode.seeders;
     });
-    _movieFocus.requestFocus();
+    _infoFocus.requestFocus();
   }
 
   bool get _hasAnyTagFilters =>
-      _langResultFilters.isNotEmpty ||
       _onlyActiveSeeders ||
       _minTenSeeders ||
       _excludeCam ||
@@ -190,7 +187,6 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _clearAllTagFilters() {
     setState(() {
-      _langResultFilters.clear();
       _onlyActiveSeeders = false;
       _minTenSeeders = false;
       _excludeCam = false;
@@ -200,79 +196,93 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  Future<void> _identifyMedia() async {
+  // -------------------------------------------------------------------
+  // Area 1: Movie / TV Series Info Lookup (AlloCiné / TVMaze / Wikidata / IMDb)
+  // -------------------------------------------------------------------
+  Future<void> _lookupMediaInfo() async {
     final l10n = AppL10n.of(context);
-    final query = _movieCtrl.text.trim();
+    final query = _infoCtrl.text.trim();
     if (query.isEmpty) {
       _showSnack(
         _mediaType == MediaType.series
             ? l10n.t('enter_series_first')
             : l10n.t('enter_movie_first'),
       );
-      _movieFocus.requestFocus();
+      _infoFocus.requestFocus();
       return;
     }
     FocusScope.of(context).unfocus();
 
     setState(() {
-      _loadingTitles = true;
-      _stage = _SearchStage.pickMedia;
+      _loadingInfo = true;
+      _hasLookedUpInfo = true;
+      _skippedInfoStep = false;
       _suggestions = [];
       _selectedMedia = null;
-      _selectedSeasonTag = null;
-      _results = [];
-      _hasSearchedTorrents = false;
     });
 
     final hits = await _allocineService.resolveTitles(query, mediaType: _mediaType);
     if (!mounted) return;
     setState(() {
-      _loadingTitles = false;
+      _loadingInfo = false;
       _suggestions = hits;
     });
   }
 
-  void _selectMediaAndSearch(MovieSuggestion media, {bool autoLaunchTorrents = true}) {
-    final titles = media.allDistinctTitles;
+  void _skipInfoStep() {
+    final typed = _infoCtrl.text.trim();
+    setState(() {
+      _skippedInfoStep = true;
+      if (_torrentQueryCtrl.text.trim().isEmpty && typed.isNotEmpty) {
+        _torrentQueryCtrl.text = typed;
+      }
+    });
+    _torrentQueryFocus.requestFocus();
+  }
+
+  void _selectMediaMatch(MovieSuggestion media) {
     setState(() {
       _selectedMedia = media;
       _mediaType = media.mediaType;
-      _movieCtrl.text = media.titleFr;
-      _selectedSeasonTag = null;
-      _activeSearchTitles
-        ..clear()
-        ..addAll(titles);
-      _stage = _SearchStage.results;
-      _results = [];
-      _hasSearchedTorrents = false;
+      _infoCtrl.text = media.titleFr;
+      _skippedInfoStep = false;
+      _setTorrentQueryFromTitle(media.titleFr, year: media.year);
     });
-    if (autoLaunchTorrents) {
-      _performTorrentSearch();
-    }
+    _torrentQueryFocus.requestFocus();
   }
 
-  void _skipMatchingAndSearchDirect() {
-    final l10n = AppL10n.of(context);
-    final query = _movieCtrl.text.trim();
-    if (query.isEmpty) {
-      _showSnack(l10n.t('enter_title_first'));
-      return;
-    }
-    final manual = MovieSuggestion(
-      titleFr: query,
-      titleOriginal: query,
-      mediaType: _mediaType,
-      source: l10n.t('direct_search'),
-    );
-    _selectMediaAndSearch(manual, autoLaunchTorrents: true);
+  /// Replaces the editable Torrent Search field with [title] (optionally with [year])
+  /// so the user can still modify it or append extra keywords before searching.
+  void _setTorrentQueryFromTitle(String title, {int? year}) {
+    final clean = title.trim();
+    final next = (year != null && _mediaType == MediaType.movie) ? '$clean $year' : clean;
+    _torrentQueryCtrl.text = next;
+    _torrentQueryCtrl.selection = TextSelection.collapsed(offset: next.length);
   }
 
+  /// Appends a helper token (e.g. `S01`, `Complete`, year, etc.) into the editable query
+  /// if not already present.
+  void _appendTokenToTorrentQuery(String token) {
+    final current = _torrentQueryCtrl.text.trim();
+    final lowerTokens = current.toLowerCase().split(RegExp(r'\s+'));
+    if (lowerTokens.contains(token.toLowerCase())) return;
+    final next = current.isEmpty ? token : '$current $token';
+    setState(() {
+      _torrentQueryCtrl.text = next;
+      _torrentQueryCtrl.selection = TextSelection.collapsed(offset: next.length);
+    });
+    _torrentQueryFocus.requestFocus();
+  }
+
+  // -------------------------------------------------------------------
+  // Area 2: Editable Torrent Search
+  // -------------------------------------------------------------------
   Future<void> _performTorrentSearch() async {
     final l10n = AppL10n.of(context);
-    final activeList = _activeSearchTitles.toList();
-    final primaryQuery = activeList.isNotEmpty ? activeList.first : _movieCtrl.text.trim();
-    if (primaryQuery.isEmpty) {
-      _showSnack(l10n.t('select_one_title'));
+    final rawQuery = _torrentQueryCtrl.text.trim();
+    if (rawQuery.isEmpty) {
+      _showSnack(l10n.t('enter_torrent_query'));
+      _torrentQueryFocus.requestFocus();
       return;
     }
 
@@ -281,16 +291,12 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() {
       _searchingTorrents = true;
       _hasSearchedTorrents = true;
-      _stage = _SearchStage.results;
       _results = [];
     });
 
     final summary = await _indexersService.search(
-      query: primaryQuery,
-      extraTitles: activeList.skip(1).toList(),
+      query: rawQuery,
       mediaType: _selectedMedia?.mediaType ?? _mediaType,
-      seasonQueryTag: _selectedSeasonTag,
-      year: _selectedMedia?.year,
       includeAllLanguages: true,
       settings: widget.storage.settings,
     );
@@ -323,7 +329,10 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _saveForLater({MovieSuggestion? overrideMedia}) async {
     final l10n = AppL10n.of(context);
     final m = overrideMedia ?? _selectedMedia;
-    final titleFr = m?.titleFr ?? _movieCtrl.text.trim();
+    final titleFr = m?.titleFr ??
+        (_infoCtrl.text.trim().isNotEmpty
+            ? _infoCtrl.text.trim()
+            : _torrentQueryCtrl.text.trim());
     if (titleFr.isEmpty) {
       _showSnack(l10n.t('enter_title_first'));
       return;
@@ -361,20 +370,6 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   bool _matchesTagFilters(TorrentResult item) {
-    if (_langResultFilters.isNotEmpty) {
-      final detected = item.detectedLanguages.map((e) => e.toUpperCase()).toSet();
-      final matchedLang = _langResultFilters.any((req) {
-        if (req == 'MULTI') return detected.contains('MULTI');
-        if (detected.contains('MULTI')) return true;
-        if (detected.contains(req)) return true;
-        if (req == 'EN' && !detected.contains('FR') && !detected.contains('ES')) {
-          return true;
-        }
-        return false;
-      });
-      if (!matchedLang) return false;
-    }
-
     if (_onlyActiveSeeders && item.seeders <= 0) return false;
     if (_minTenSeeders && item.seeders < 10) return false;
 
@@ -528,11 +523,15 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     final visibleResults = _filteredAndSortedResults;
-    final canReset = _stage != _SearchStage.input ||
-        _movieCtrl.text.isNotEmpty ||
+    final canReset = _infoCtrl.text.isNotEmpty ||
+        _torrentQueryCtrl.text.isNotEmpty ||
         _selectedMedia != null ||
+        _suggestions.isNotEmpty ||
+        _skippedInfoStep ||
         _results.isNotEmpty;
     final isSeries = _mediaType == MediaType.series;
+    final showTorrentSearchArea =
+        _skippedInfoStep || _selectedMedia != null || _hasSearchedTorrents || _torrentQueryCtrl.text.isNotEmpty;
 
     return Center(
       child: ConstrainedBox(
@@ -540,6 +539,7 @@ class _SearchScreenState extends State<SearchScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // Top bar: clear 2-part indicator + reset button
             Row(
               children: [
                 Expanded(
@@ -548,18 +548,13 @@ class _SearchScreenState extends State<SearchScreen> {
                     runSpacing: 6,
                     children: [
                       _stepPill(
-                        isSeries ? l10n.t('step_series') : l10n.t('step_movie'),
-                        active: _stage == _SearchStage.input,
-                        done: _stage != _SearchStage.input,
+                        l10n.t('phase_info'),
+                        active: !showTorrentSearchArea,
+                        done: _selectedMedia != null || _skippedInfoStep,
                       ),
                       _stepPill(
-                        l10n.t('step_match'),
-                        active: _stage == _SearchStage.pickMedia,
-                        done: _stage == _SearchStage.results,
-                      ),
-                      _stepPill(
-                        l10n.t('step_torrents'),
-                        active: _stage == _SearchStage.results,
+                        l10n.t('phase_torrent'),
+                        active: showTorrentSearchArea,
                         done: false,
                       ),
                     ],
@@ -575,41 +570,161 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
             const SizedBox(height: 12),
 
+            // ===========================================================
+            // SECTION 1 — Movie / TV Series Information Lookup (Optional)
+            // ===========================================================
+            if (_selectedMedia != null)
+              _buildSelectedMediaInfoCard(l10n, _selectedMedia!)
+            else
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.info_outline, color: Color(0xFF38BDF8), size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              l10n.t('info_section_title'),
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        l10n.t('info_section_subtitle'),
+                        style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ChoiceChip(
+                            selected: _mediaType == MediaType.movie,
+                            onSelected: (_) => setState(() => _mediaType = MediaType.movie),
+                            avatar: const Icon(Icons.movie_outlined, size: 17),
+                            label: Text(l10n.t('movies')),
+                          ),
+                          ChoiceChip(
+                            selected: _mediaType == MediaType.series,
+                            onSelected: (_) => setState(() => _mediaType = MediaType.series),
+                            avatar: const Icon(Icons.tv_outlined, size: 17),
+                            label: Text(l10n.t('tv_series')),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        key: const Key('info_lookup_field'),
+                        controller: _infoCtrl,
+                        focusNode: _infoFocus,
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => _lookupMediaInfo(),
+                        onChanged: (_) => setState(() {}),
+                        decoration: InputDecoration(
+                          labelText: isSeries ? l10n.t('series_name') : l10n.t('movie_name'),
+                          hintText: isSeries ? l10n.t('series_hint') : l10n.t('movie_hint'),
+                          prefixIcon: Icon(isSeries ? Icons.tv_outlined : Icons.movie_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: _loadingInfo ? null : _lookupMediaInfo,
+                            icon: _loadingInfo
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.manage_search),
+                            label: Text(
+                              isSeries ? l10n.t('identify_series') : l10n.t('identify_movie'),
+                            ),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: _skipInfoStep,
+                            icon: const Icon(Icons.fast_forward_outlined, size: 18),
+                            label: Text(l10n.t('skip_direct')),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // Info lookup results (pick a movie / series to populate titles)
+            if (_selectedMedia == null && (_loadingInfo || _hasLookedUpInfo)) ...[
+              const SizedBox(height: 12),
+              _buildInfoLookupResults(l10n),
+            ],
+
+            const SizedBox(height: 14),
+
+            // ===========================================================
+            // SECTION 2 — Editable Torrent Search (Distinct Card!)
+            // ===========================================================
             Card(
+              color: const Color(0xFF13203B),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(
+                  color: showTorrentSearchArea
+                      ? const Color(0xFF38BDF8)
+                      : const Color(0xFF243559),
+                  width: showTorrentSearchArea ? 1.3 : 1,
+                ),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                    Row(
                       children: [
-                        ChoiceChip(
-                          selected: _mediaType == MediaType.movie,
-                          onSelected: (_) => setState(() => _mediaType = MediaType.movie),
-                          avatar: const Icon(Icons.movie_outlined, size: 17),
-                          label: Text(l10n.t('movies')),
-                        ),
-                        ChoiceChip(
-                          selected: _mediaType == MediaType.series,
-                          onSelected: (_) => setState(() => _mediaType = MediaType.series),
-                          avatar: const Icon(Icons.tv_outlined, size: 17),
-                          label: Text(l10n.t('tv_series')),
+                        const Icon(Icons.travel_explore, color: Color(0xFF22C55E), size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            l10n.t('torrent_section_title'),
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                          ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      l10n.t('torrent_section_subtitle'),
+                      style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+                    ),
                     const SizedBox(height: 12),
                     TextField(
-                      controller: _movieCtrl,
-                      focusNode: _movieFocus,
+                      key: const Key('torrent_query_field'),
+                      controller: _torrentQueryCtrl,
+                      focusNode: _torrentQueryFocus,
                       textInputAction: TextInputAction.search,
-                      onSubmitted: (_) => _identifyMedia(),
+                      onSubmitted: (_) => _performTorrentSearch(),
                       onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
-                        labelText: isSeries ? l10n.t('series_name') : l10n.t('movie_name'),
-                        hintText: isSeries ? l10n.t('series_hint') : l10n.t('movie_hint'),
-                        prefixIcon: Icon(isSeries ? Icons.tv_outlined : Icons.movie_outlined),
+                        labelText: l10n.t('torrent_query_label'),
+                        hintText: l10n.t('torrent_query_hint'),
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _torrentQueryCtrl.text.isNotEmpty
+                            ? IconButton(
+                                tooltip: l10n.t('clear_query'),
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () => setState(() => _torrentQueryCtrl.clear()),
+                              )
+                            : null,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -618,23 +733,26 @@ class _SearchScreenState extends State<SearchScreen> {
                       runSpacing: 8,
                       children: [
                         FilledButton.icon(
-                          onPressed: _loadingTitles ? null : _identifyMedia,
-                          icon: _loadingTitles
+                          onPressed: _searchingTorrents ? null : _performTorrentSearch,
+                          icon: _searchingTorrents
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Icon(Icons.search),
+                              : const Icon(Icons.search, size: 18),
                           label: Text(
-                            isSeries ? l10n.t('identify_series') : l10n.t('identify_movie'),
+                            _hasSearchedTorrents
+                                ? l10n.t('rerun_torrent_search')
+                                : l10n.t('launch_torrent_search'),
                           ),
                         ),
-                        OutlinedButton.icon(
-                          onPressed: _searchingTorrents ? null : _skipMatchingAndSearchDirect,
-                          icon: const Icon(Icons.fast_forward_outlined, size: 18),
-                          label: Text(l10n.t('skip_direct')),
-                        ),
+                        if (_selectedMedia != null || _torrentQueryCtrl.text.trim().isNotEmpty)
+                          OutlinedButton.icon(
+                            onPressed: _saveForLater,
+                            icon: const Icon(Icons.bookmark_add_outlined, size: 17),
+                            label: Text(l10n.t('save_for_later')),
+                          ),
                       ],
                     ),
                   ],
@@ -644,14 +762,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
             const SizedBox(height: 14),
 
-            if (_stage == _SearchStage.pickMedia) _buildStep2Suggestions(l10n),
-
-            if (_stage == _SearchStage.results && _selectedMedia != null) ...[
-              _buildSelectedMediaBanner(l10n, _selectedMedia!),
-              const SizedBox(height: 12),
-            ],
-
-            if (_stage == _SearchStage.results && _results.isNotEmpty) ...[
+            // Quick filters card (NO language filter!)
+            if (_results.isNotEmpty) ...[
               _buildCategorizedFiltersCard(l10n, visibleResults.length),
               const SizedBox(height: 12),
             ],
@@ -669,7 +781,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                 ),
               )
-            else if (_stage == _SearchStage.results && _hasSearchedTorrents && _results.isEmpty)
+            else if (_hasSearchedTorrents && _results.isEmpty)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
@@ -710,9 +822,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                 ),
               )
-            else if (_stage == _SearchStage.results &&
-                _results.isNotEmpty &&
-                visibleResults.isEmpty)
+            else if (_results.isNotEmpty && visibleResults.isEmpty)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
@@ -747,7 +857,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                 ),
               )
-            else if (_stage == _SearchStage.results && visibleResults.isNotEmpty) ...[
+            else if (visibleResults.isNotEmpty) ...[
               Wrap(
                 alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
@@ -827,11 +937,11 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildStep2Suggestions(AppL10n l10n) {
-    if (_loadingTitles) {
+  Widget _buildInfoLookupResults(AppL10n l10n) {
+    if (_loadingInfo) {
       return Card(
         child: Padding(
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(24),
           child: Column(
             children: [
               const CircularProgressIndicator(),
@@ -850,39 +960,27 @@ class _SearchScreenState extends State<SearchScreen> {
     if (_suggestions.isEmpty) {
       return Card(
         child: Padding(
-          padding: const EdgeInsets.all(22),
+          padding: const EdgeInsets.all(18),
           child: Column(
             children: [
-              const Icon(Icons.search_off_outlined, size: 42, color: Color(0xFF94A3B8)),
+              const Icon(Icons.search_off_outlined, size: 36, color: Color(0xFF94A3B8)),
               const SizedBox(height: 8),
               Text(
                 l10n.t('no_match_found'),
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 l10n.t('no_match_hint'),
-                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.center,
-                children: [
-                  FilledButton.icon(
-                    onPressed: _skipMatchingAndSearchDirect,
-                    icon: const Icon(Icons.search),
-                    label: Text(l10n.t('search_anyway')),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _saveForLater,
-                    icon: const Icon(Icons.bookmark_add_outlined),
-                    label: Text(l10n.t('save_for_later')),
-                  ),
-                ],
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _skipInfoStep,
+                icon: const Icon(Icons.fast_forward_outlined, size: 17),
+                label: Text(l10n.t('skip_search_text')),
               ),
             ],
           ),
@@ -904,28 +1002,6 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
             const SizedBox(height: 10),
             ..._suggestions.map((s) => _buildSuggestionCard(l10n, s)),
-            const Divider(height: 20),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(
-                  l10n.t('cant_find_match'),
-                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _skipMatchingAndSearchDirect,
-                  icon: const Icon(Icons.fast_forward_outlined, size: 16),
-                  label: Text(l10n.t('skip_search_text')),
-                ),
-                TextButton.icon(
-                  onPressed: _saveForLater,
-                  icon: const Icon(Icons.bookmark_add_outlined, size: 16),
-                  label: Text(l10n.t('save_for_later')),
-                ),
-              ],
-            ),
           ],
         ),
       ),
@@ -1102,13 +1178,9 @@ class _SearchScreenState extends State<SearchScreen> {
                   runSpacing: 6,
                   children: [
                     FilledButton.icon(
-                      onPressed: () => _selectMediaAndSearch(s, autoLaunchTorrents: true),
-                      icon: const Icon(Icons.search, size: 17),
-                      label: Text(l10n.t('select_and_search')),
-                    ),
-                    OutlinedButton(
-                      onPressed: () => _selectMediaAndSearch(s, autoLaunchTorrents: false),
-                      child: Text(l10n.t('choose_titles_season')),
+                      onPressed: () => _selectMediaMatch(s),
+                      icon: const Icon(Icons.check_circle_outline, size: 17),
+                      label: Text(l10n.t('pick_this_title')),
                     ),
                     TextButton.icon(
                       onPressed: () => _saveForLater(overrideMedia: s),
@@ -1125,26 +1197,36 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildSelectedMediaBanner(AppL10n l10n, MovieSuggestion media) {
-    final allTitles = media.allDistinctTitles;
-    String? flagCodeForTitle(String t) {
-      final low = t.toLowerCase();
-      if (low == media.titleFr.toLowerCase()) return 'FR';
-      if (media.titleEn != null && low == media.titleEn!.toLowerCase()) return 'EN';
-      if (media.titleEs != null && low == media.titleEs!.toLowerCase()) return 'ES';
-      return null;
-    }
+  /// Displays the selected Movie/Series info card with clickable localized title
+  /// buttons that populate the editable Torrent Search box below.
+  Widget _buildSelectedMediaInfoCard(AppL10n l10n, MovieSuggestion media) {
+    final localizedChoices = <(String? flagCode, String title)>[
+      ('FR', media.titleFr),
+      if (media.titleEn != null &&
+          media.titleEn!.trim().isNotEmpty &&
+          media.titleEn!.toLowerCase() != media.titleFr.toLowerCase())
+        ('EN', media.titleEn!.trim()),
+      if (media.titleEs != null &&
+          media.titleEs!.trim().isNotEmpty &&
+          media.titleEs!.toLowerCase() != media.titleFr.toLowerCase() &&
+          media.titleEs!.toLowerCase() != (media.titleEn ?? '').toLowerCase())
+        ('ES', media.titleEs!.trim()),
+      if (media.titleOriginal.trim().isNotEmpty &&
+          media.titleOriginal.toLowerCase() != media.titleFr.toLowerCase() &&
+          media.titleOriginal.toLowerCase() != (media.titleEn ?? '').toLowerCase() &&
+          media.titleOriginal.toLowerCase() != (media.titleEs ?? '').toLowerCase())
+        (null, media.titleOriginal.trim()),
+    ];
 
-    final maxSeasons = (media.seasonCount ?? 0).clamp(0, 12);
+    final maxSeasons = (media.seasonCount ?? 0).clamp(0, 10);
 
     return Card(
-      color: const Color(0xFF13203B),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildPoster(media.posterUrl, width: 76, height: 112),
+            _buildPoster(media.posterUrl, width: 74, height: 110),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -1158,59 +1240,49 @@ class _SearchScreenState extends State<SearchScreen> {
                           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                         ),
                       ),
-                      if (_suggestions.length > 1)
-                        TextButton(
-                          onPressed: () => setState(() => _stage = _SearchStage.pickMedia),
-                          child: Text(
-                            media.mediaType == MediaType.series
-                                ? l10n.t('change_series')
-                                : l10n.t('change_movie'),
-                          ),
+                      TextButton(
+                        onPressed: () => setState(() => _selectedMedia = null),
+                        child: Text(
+                          media.mediaType == MediaType.series
+                              ? l10n.t('change_series')
+                              : l10n.t('change_movie'),
                         ),
+                      ),
                     ],
                   ),
                   _buildSeriesBadges(l10n, media),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Text(
-                    l10n.t('titles_used'),
+                    l10n.t('click_title_to_fill'),
                     style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                   ),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
-                    children: allTitles.map((t) {
-                      final selected = _activeSearchTitles.contains(t);
-                      final code = flagCodeForTitle(t);
-                      return FilterChip(
-                        selected: selected,
-                        onSelected: (v) {
-                          setState(() {
-                            if (v) {
-                              _activeSearchTitles.add(t);
-                            } else if (_activeSearchTitles.length > 1) {
-                              _activeSearchTitles.remove(t);
-                            }
-                          });
-                        },
-                        label: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (code != null) ...[
-                              CountryFlag(code: code, width: 17, height: 12),
-                              const SizedBox(width: 6),
-                            ],
-                            Text(t, style: const TextStyle(fontSize: 12)),
-                          ],
+                    children: [
+                      for (final (code, title) in localizedChoices)
+                        ActionChip(
+                          onPressed: () {
+                            setState(() => _setTorrentQueryFromTitle(title, year: media.year));
+                            _torrentQueryFocus.requestFocus();
+                          },
+                          avatar: code != null
+                              ? CountryFlag(code: code, width: 17, height: 12)
+                              : const Icon(Icons.title, size: 15),
+                          label: Text(title, style: const TextStyle(fontSize: 12)),
                         ),
-                      );
-                    }).toList(),
+                      if (media.year != null)
+                        ActionChip(
+                          onPressed: () => _appendTokenToTorrentQuery('${media.year}'),
+                          label: Text('+ ${media.year}', style: const TextStyle(fontSize: 12)),
+                        ),
+                    ],
                   ),
-
                   if (media.mediaType == MediaType.series) ...[
                     const SizedBox(height: 8),
                     Text(
-                      l10n.t('target_season'),
+                      l10n.t('append_season_hint'),
                       style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                     ),
                     const SizedBox(height: 6),
@@ -1218,55 +1290,25 @@ class _SearchScreenState extends State<SearchScreen> {
                       spacing: 6,
                       runSpacing: 6,
                       children: [
-                        ChoiceChip(
-                          selected: _selectedSeasonTag == null,
-                          onSelected: (_) => setState(() => _selectedSeasonTag = null),
-                          label: Text(l10n.t('all_seasons'), style: const TextStyle(fontSize: 12)),
-                        ),
                         for (var s = 1; s <= (maxSeasons > 0 ? maxSeasons : 5); s++)
-                          ChoiceChip(
-                            selected: _selectedSeasonTag == 'S${s.toString().padLeft(2, '0')}',
-                            onSelected: (_) => setState(
-                              () => _selectedSeasonTag = 'S${s.toString().padLeft(2, '0')}',
-                            ),
+                          ActionChip(
+                            onPressed: () =>
+                                _appendTokenToTorrentQuery('S${s.toString().padLeft(2, '0')}'),
                             label: Text(
-                              'S${s.toString().padLeft(2, '0')}',
+                              '+ S${s.toString().padLeft(2, '0')}',
                               style: const TextStyle(fontSize: 12),
                             ),
                           ),
-                        ChoiceChip(
-                          selected: _selectedSeasonTag == 'Complete',
-                          onSelected: (_) => setState(() => _selectedSeasonTag = 'Complete'),
+                        ActionChip(
+                          onPressed: () => _appendTokenToTorrentQuery('Complete'),
                           label: Text(
-                            l10n.t('complete_series'),
+                            '+ ${l10n.t('complete_series')}',
                             style: const TextStyle(fontSize: 12),
                           ),
                         ),
                       ],
                     ),
                   ],
-
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      FilledButton.icon(
-                        onPressed: _searchingTorrents ? null : _performTorrentSearch,
-                        icon: const Icon(Icons.search, size: 17),
-                        label: Text(
-                          _hasSearchedTorrents
-                              ? l10n.t('rerun_torrent_search')
-                              : l10n.t('launch_torrent_search'),
-                        ),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: _saveForLater,
-                        icon: const Icon(Icons.bookmark_add_outlined, size: 17),
-                        label: Text(l10n.t('save_for_later')),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -1276,6 +1318,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  /// Quick filters organized cleanly by category (NO language filter).
   Widget _buildCategorizedFiltersCard(AppL10n l10n, int visibleCount) {
     Widget categoryRow(String title, List<Widget> chips) {
       return Padding(
@@ -1333,35 +1376,6 @@ class _SearchScreenState extends State<SearchScreen> {
               ],
             ),
             const SizedBox(height: 10),
-            categoryRow(l10n.t('cat_languages'), [
-              for (final entry in const [
-                ('FR', 'Français'),
-                ('EN', 'English'),
-                ('ES', 'Español'),
-                ('DE', 'Deutsch'),
-                ('NL', 'Nederlands'),
-                ('IT', 'Italiano'),
-                ('MULTI', 'MULTI'),
-              ])
-                FilterChip(
-                  selected: _langResultFilters.contains(entry.$1),
-                  onSelected: (v) => setState(() {
-                    if (v) {
-                      _langResultFilters.add(entry.$1);
-                    } else {
-                      _langResultFilters.remove(entry.$1);
-                    }
-                  }),
-                  label: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CountryFlag(code: entry.$1, width: 17, height: 12),
-                      const SizedBox(width: 6),
-                      Text(entry.$2, style: const TextStyle(fontSize: 12)),
-                    ],
-                  ),
-                ),
-            ]),
             categoryRow(l10n.t('cat_availability'), [
               FilterChip(
                 selected: _onlyActiveSeeders,
@@ -1462,6 +1476,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   is4k ? const Color(0xFF4C1D95) : const Color(0xFF0C4A6E),
                   is4k ? const Color(0xFFD8B4FE) : const Color(0xFF7DD3FC),
                 ),
+                // Display crisp vector country flags whenever languages are detected
                 ...item.detectedLanguages.map(
                   (l) => _flagPill(
                     l,

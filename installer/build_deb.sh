@@ -11,15 +11,24 @@ mkdir -p \
   "$PKG_DIR/opt/torrent-seeder" \
   "$PKG_DIR/usr/bin" \
   "$PKG_DIR/usr/share/applications" \
-  "$PKG_DIR/usr/share/icons/hicolor/256x256/apps"
+  "$PKG_DIR/usr/share/pixmaps" \
+  "$PKG_DIR/usr/share/icons/hicolor/48x48/apps" \
+  "$PKG_DIR/usr/share/icons/hicolor/128x128/apps" \
+  "$PKG_DIR/usr/share/icons/hicolor/256x256/apps" \
+  "$PKG_DIR/usr/share/icons/hicolor/512x512/apps"
 
 cp -r "$BUNDLE_DIR"/* "$PKG_DIR/opt/torrent-seeder/"
 chmod +x "$PKG_DIR/opt/torrent-seeder/safetorrent"
 
 ln -s /opt/torrent-seeder/safetorrent "$PKG_DIR/usr/bin/torrent-seeder"
 
+for sz in 48 128 256 512; do
+  if [ -f "build/linux_icons/icon_${sz}.png" ]; then
+    cp "build/linux_icons/icon_${sz}.png" "$PKG_DIR/usr/share/icons/hicolor/${sz}x${sz}/apps/torrent-seeder.png"
+  fi
+done
 if [ -f "build/deb_icon_256.png" ]; then
-  cp "build/deb_icon_256.png" "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/torrent-seeder.png"
+  cp "build/deb_icon_256.png" "$PKG_DIR/usr/share/pixmaps/torrent-seeder.png"
 fi
 
 cat > "$PKG_DIR/DEBIAN/control" <<EOF
@@ -30,18 +39,19 @@ Priority: optional
 Architecture: amd64
 Depends: libgtk-3-0, libblkid1, liblzma5
 Maintainer: Torrent Seeder Contributors <noreply@github.com>
-Description: Recherche de fichiers .torrent autonome avec bac a sable anti-virus et Seedr
- Torrent Seeder permet de rechercher des films et series TV (AlloCine, TVMaze,
- Wikidata), de suivre les dates de sortie des prochaines saisons, d'inspecter
- les fichiers .torrent dans un bac a sable et d'envoyer vers Seedr.
+Description: Standalone Movie & TV Series torrent search engine with anti-malware sandbox & Seedr
+ Torrent Seeder searches Movies and TV Series (AlloCine, TVMaze, Wikidata),
+ inspects and sanitizes .torrent files in an isolated sandbox, and integrates
+ with one or more Seedr.cc accounts.
 EOF
 
 cat > "$PKG_DIR/usr/share/applications/torrent-seeder.desktop" <<EOF
 [Desktop Entry]
 Name=Torrent Seeder
-Comment=Recherche de fichiers .torrent Films & Series avec bac a sable anti-virus et Seedr
+Comment=Standalone Movie & TV Series Torrent Search with Anti-Malware Sandbox & Seedr
 Exec=/usr/bin/torrent-seeder
 Icon=torrent-seeder
+StartupWMClass=safetorrent
 Terminal=false
 Type=Application
 Categories=Network;Utility;AudioVideo;

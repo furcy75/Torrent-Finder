@@ -6,11 +6,12 @@ import 'package:safetorrent/l10n/app_l10n.dart';
 import 'package:safetorrent/main.dart';
 import 'package:safetorrent/models/app_settings.dart';
 import 'package:safetorrent/services/local_storage.dart';
+import 'package:safetorrent/services/release_parser.dart';
 import 'package:safetorrent/ui/widgets/country_flag.dart';
 
 void main() {
   testWidgets(
-      'Torrent Seeder supports 6 languages via flag switcher, Donate icon, and Seedr multi-accounts',
+      'Torrent Seeder splits Info Lookup & editable Torrent Search, uses Seedr login/password only, and switches 6 languages',
       (tester) async {
     final tmpDir = Directory.systemTemp.createTempSync('torrent_seeder_widget_');
     addTearDown(() {
@@ -26,14 +27,29 @@ void main() {
     await tester.pumpWidget(TorrentSeederApp(storage: storage));
     await tester.pumpAndSettle();
 
-    // Launches cleanly in English
+    // Launches cleanly in English with separated Info Lookup and Torrent Search sections
     expect(find.text('Torrent Seeder'), findsOneWidget);
-    expect(find.text('Movies'), findsOneWidget);
-    expect(find.text('TV Series'), findsOneWidget);
-    expect(find.text('Search'), findsOneWidget);
-    expect(find.text('Watchlist'), findsOneWidget);
-    expect(find.text('Seedr'), findsOneWidget);
-    expect(find.text('TorBox'), findsNothing);
+    expect(find.text('Movie / TV Series Info Lookup (optional)'), findsOneWidget);
+    expect(find.text('Torrent Search'), findsOneWidget);
+    expect(find.byKey(const Key('info_lookup_field')), findsOneWidget);
+    expect(find.byKey(const Key('torrent_query_field')), findsOneWidget);
+
+    // Skipping info step copies typed title into the editable Torrent Search box
+    await tester.enterText(find.byKey(const Key('info_lookup_field')), 'Inception');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Skip this step'));
+    await tester.pumpAndSettle();
+    final torrentField =
+        tester.widget<TextField>(find.byKey(const Key('torrent_query_field')));
+    expect(torrentField.controller?.text, equals('Inception'));
+
+    // User can edit the Torrent Search box freely to add extra keywords
+    await tester.enterText(
+      find.byKey(const Key('torrent_query_field')),
+      'Inception 2010 FRENCH 1080p',
+    );
+    await tester.pumpAndSettle();
+    expect(torrentField.controller?.text, equals('Inception 2010 FRENCH 1080p'));
 
     // Switch live to French via the flag switcher next to Settings
     await tester.tap(find.byKey(const Key('language_switcher_btn')));
@@ -41,18 +57,17 @@ void main() {
     await tester.tap(find.text('Français'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Films'), findsOneWidget);
-    expect(find.text('Séries TV'), findsOneWidget);
+    expect(find.text('Recherche Torrent'), findsOneWidget);
     expect(find.text('Rechercher'), findsOneWidget);
     expect(storage.settings.appLanguage, equals('fr'));
 
-    // Switch live to German and verify translation
+    // Switch live to German
     await tester.tap(find.byKey(const Key('language_switcher_btn')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Deutsch'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Filme'), findsOneWidget);
+    expect(find.text('Torrent-Suche'), findsOneWidget);
     expect(find.text('Suchen'), findsOneWidget);
     expect(storage.settings.appLanguage, equals('de'));
 
@@ -65,32 +80,31 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Switch to Seedr tab and verify both auth flows
+    // Seedr tab shows Email & Password login ONLY (no Device Code flow)
     await tester.tap(find.text('Seedr'));
     await tester.pumpAndSettle();
-    expect(find.text('Gerätecode (Empfohlen)'), findsOneWidget);
-    expect(find.text('E-Mail & Passwort'), findsOneWidget);
-
-    // Return to Search tab & test reset button
-    await tester.tap(find.text('Suchen'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).first, 'Severance');
-    await tester.pumpAndSettle();
-    expect(find.text('Neue Suche'), findsOneWidget);
-
-    await tester.tap(find.text('Neue Suche'));
-    await tester.pumpAndSettle();
-    expect(find.text('Severance'), findsNothing);
+    expect(find.text('Seedr E-Mail / Login'), findsOneWidget);
+    expect(find.text('Seedr Passwort'), findsOneWidget);
+    expect(find.text('Gerätecode (Empfohlen)'), findsNothing);
+    expect(find.text('Code Appareil (Recommandé)'), findsNothing);
   });
 
   test('AppL10n provides complete translations for all 6 languages (en, fr, es, de, nl, it)', () {
     for (final lang in AppL10n.supported) {
       final l10n = AppL10n(lang.code);
-      expect(l10n.t('tab_search'), isNot(equals('tab_search')));
+      expect(l10n.t('info_section_title'), isNot(equals('info_section_title')));
+      expect(l10n.t('torrent_section_title'), isNot(equals('torrent_section_title')));
       expect(l10n.t('dl_done_title'), isNot(equals('dl_done_title')));
       expect(l10n.t('picker_downloading_one'), isNot(equals('picker_downloading_one')));
       expect(l10n.t('donate_cta'), isNot(equals('donate_cta')));
     }
+  });
+
+  test('ReleaseParser detects DE, NL, IT, FR, ES, EN, MULTI flags for result cards', () {
+    expect(ReleaseParser.detectLanguages('Film.2024.GERMAN.1080p'), contains('DE'));
+    expect(ReleaseParser.detectLanguages('Film.2024.DUTCH.NL.1080p'), contains('NL'));
+    expect(ReleaseParser.detectLanguages('Film.2024.ITALIAN.ITA.1080p'), contains('IT'));
+    expect(ReleaseParser.detectLanguages('Film.2024.MULTI.TRUEFRENCH.1080p'), containsAll(['MULTI', 'FR']));
   });
 
   testWidgets('CountryFlag renders vector flags for EN, FR, ES, DE, NL, IT, MULTI without errors',
