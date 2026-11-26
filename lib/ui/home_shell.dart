@@ -79,11 +79,11 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   Future<void> _selectLanguage(String code) async {
+    widget.onLanguageChanged?.call(code);
+    if (mounted) setState(() {});
     await widget.storage.updateSettings(
       widget.storage.settings.copyWith(appLanguage: code),
     );
-    widget.onLanguageChanged?.call(code);
-    if (mounted) setState(() {});
   }
 
   void _triggerSearch(PendingSearchRequest req) {
