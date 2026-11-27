@@ -163,6 +163,8 @@ class _SearchScreenState extends State<SearchScreen> {
       _selectedMedia = null;
       _results = [];
       _queriedIndexers = [];
+      _countsByIndexer = {};
+      _indexerErrors = {};
       _activeWatchlistId = null;
       _searchingTorrents = false;
       _hasSearchedTorrents = false;
@@ -275,8 +277,11 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   // -------------------------------------------------------------------
-  // Area 2: Editable Torrent Search
+  // Area 2: Editable Torrent Search (Full Catalog)
   // -------------------------------------------------------------------
+  Map<String, int> _countsByIndexer = {};
+  Map<String, String> _indexerErrors = {};
+
   Future<void> _performTorrentSearch() async {
     final l10n = AppL10n.of(context);
     final rawQuery = _torrentQueryCtrl.text.trim();
@@ -292,6 +297,8 @@ class _SearchScreenState extends State<SearchScreen> {
       _searchingTorrents = true;
       _hasSearchedTorrents = true;
       _results = [];
+      _countsByIndexer = {};
+      _indexerErrors = {};
     });
 
     final summary = await _indexersService.search(
@@ -322,6 +329,8 @@ class _SearchScreenState extends State<SearchScreen> {
       _searchingTorrents = false;
       _results = summary.results;
       _queriedIndexers = summary.indexersQueried;
+      _countsByIndexer = summary.countsByIndexer;
+      _indexerErrors = summary.errors;
     });
     widget.onDataChanged();
   }
@@ -790,7 +799,11 @@ class _SearchScreenState extends State<SearchScreen> {
                       const Icon(Icons.movie_filter_outlined, size: 44, color: Color(0xFF94A3B8)),
                       const SizedBox(height: 10),
                       Text(
-                        isSeries ? l10n.t('no_torrents_series') : l10n.t('no_torrents_movie'),
+                        _selectedMedia == null
+                            ? l10n.t('no_torrents_any')
+                            : (isSeries
+                                ? l10n.t('no_torrents_series')
+                                : l10n.t('no_torrents_movie')),
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                         textAlign: TextAlign.center,
                       ),
@@ -800,6 +813,10 @@ class _SearchScreenState extends State<SearchScreen> {
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: Color(0xFF94A3B8)),
                       ),
+                      if (_indexerErrors.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _buildIndexerErrorsChip(l10n),
+                      ],
                       const SizedBox(height: 16),
                       Wrap(
                         spacing: 10,
@@ -864,13 +881,21 @@ class _SearchScreenState extends State<SearchScreen> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  Text(
-                    l10n.t('results_summary', {
-                      'visible': '${visibleResults.length}',
-                      'total': '${_results.length}',
-                      'indexers': _queriedIndexers.join(', '),
-                    }),
-                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      Text(
+                        l10n.t('results_summary', {
+                          'visible': '${visibleResults.length}',
+                          'total': '${_results.length}',
+                          'indexers': _formatSourcesBreakdown(),
+                        }),
+                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                      ),
+                      if (_indexerErrors.isNotEmpty) _buildIndexerErrorsChip(l10n),
+                    ],
                   ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -915,6 +940,94 @@ class _SearchScreenState extends State<SearchScreen> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  String _formatSourcesBreakdown() {
+    final active = _countsByIndexer.entries.where((e) => e.value > 0).toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    if (active.isNotEmpty) {
+      return active.map((e) => '${e.key} (${e.value})').join(', ');
+    }
+    return _queriedIndexers.join(', ');
+  }
+
+  Widget _buildIndexerErrorsChip(AppL10n l10n) {
+    final tooltipText = _indexerErrors.entries.map((e) => '${e.key}: ${e.value}').join('\n');
+    return Tooltip(
+      message: tooltipText,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: () => _showSourceErrorsDialog(l10n),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0xFF451A03),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: const Color(0xFFF59E0B)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.warning_amber_rounded, size: 13, color: Color(0xFFFDE68A)),
+              const SizedBox(width: 4),
+              Text(
+                l10n.t('sources_errors_chip', {'count': '${_indexerErrors.length}'}),
+                style: const TextStyle(
+                  color: Color(0xFFFDE68A),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSourceErrorsDialog(AppL10n l10n) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF111C33),
+        title: Text(l10n.t('sources_errors_title')),
+        content: SizedBox(
+          width: 440,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: _indexerErrors.entries
+                  .map(
+                    (e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            e.key,
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                          ),
+                          Text(
+                            e.value,
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l10n.t('close')),
+          ),
+        ],
       ),
     );
   }

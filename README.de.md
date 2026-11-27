@@ -4,7 +4,7 @@
 
 # Torrent Seeder
 
-**Autarke Film- & Serien-Torrent-Suchmaschine mit integrierter Anti-Malware-Sandbox & Multi-Account-Seedr.cc-Integration**
+**Autarke Gesamtkatalog-Torrent-Suchmaschine mit eigenem Website-Extraktor, Anti-Malware-Sandbox & Multi-Account-Seedr.cc-Integration**
 
 *100 % autark auf Android, Windows und Linux — Kein Server, keine Werbung, kein unsicherer Browser, 6 Sprachen.*
 
@@ -50,7 +50,7 @@ Laden Sie die aktuelle Version direkt über [**GitHub Releases**](https://github
 - **Getrennte Info-Suche & bearbeitbare Torrent-Suche**: suchen Sie zuerst Film-/Serien-Infos (optional — AlloCiné, Wikidata, TVMaze, IMDb), klicken Sie auf einen Titel in der gewünschten Sprache und passen Sie die Torrent-Suchanfrage frei an.
 - **Schnellfilter, Sprachflaggen in Ergebnissen & NFO-Viewer**: aktive Seeder, Maximalgröße, Auflösung, Codec (`H.264 / x264`, `x265`, `HDR`), CAM/TS standardmäßig ausgeblendet, Vektor-Flaggen für erkannte Sprachen in den Ergebnissen und sicherer Klartext-NFO-Viewer.
 - **Seedr.cc-Integration (ein oder mehrere Konten)**: Anmeldung mit **E-Mail & Passwort** (nur das OAuth-Token wird gespeichert, niemals das Passwort), manuelle Kontoauswahl mit **freiem Speicher & Anzeige laufender Downloads**, sowie ein **diskretes Pop-up „Datei heruntergeladen“** (ohne Dateidetails) nach Abschluss.
-- **10 integrierte Quellen + Torznab**: YTS, APIBay, Knaben, TorrentCSV, SolidTorrents, EZTV, BitSearch, Nyaa, LimeTorrents, Internet Archive + Jackett/Prowlarr.
+- **11 integrierte Quellen (Gesamtkatalog) + Eigene Websites + Torznab**: Knaben, APIBay, TorrentCSV, YTS (Multi-Mirror), EZTV, BitSearch, Nyaa, SubsPlease, SolidTorrents, LimeTorrents, Internet Archive (Filme, Serien, Anime, Musik, Bücher, Software...), plus **Eigene Websites** in ⚙️ Einstellungen (Such-URL mit `{query}`, HTML/CSS/RSS/JSON-Extraktion, 2-Schritt-Modus, Test-Button, JSON Import/Export) und Jackett/Prowlarr.
 
 ---
 

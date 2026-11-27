@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${1:-2.0.0}"
+VERSION="${1:-2.1.0}"
 BUNDLE_DIR="build/linux/x64/release/bundle"
 PKG_DIR="build/deb/torrent-seeder_${VERSION}_amd64"
 

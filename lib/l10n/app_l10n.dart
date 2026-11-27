@@ -53,8 +53,13 @@ class AppL10n {
   }
 
   String t(String key, [Map<String, String> params = const {}]) {
+    final extra = _extraStrings[code] ?? _extraStrings['en']!;
     final table = _strings[code] ?? _strings['en']!;
-    var value = table[key] ?? _strings['en']![key] ?? key;
+    var value = extra[key] ??
+        table[key] ??
+        _extraStrings['en']![key] ??
+        _strings['en']![key] ??
+        key;
     if (params.isNotEmpty) {
       params.forEach((k, v) {
         value = value.replaceAll('{$k}', v);
@@ -62,6 +67,250 @@ class AppL10n {
     }
     return value;
   }
+
+  /// v2.1.0 additions & full-catalog wording overrides across all 6 languages.
+  static const Map<String, Map<String, String>> _extraStrings = {
+    'en': {
+      'app_subtitle': 'Standalone • Full Catalog • Sandbox Active',
+      'torrent_section_subtitle':
+          'Full-catalog search (movies, series, anime, music, books, software, games...). Pick a title above or type freely below.',
+      'no_torrents_any': 'No torrents found for this query',
+      'sources_errors_chip': '{count} source(s) unavailable',
+      'sources_errors_title': 'Source status details',
+      'settings_sources_section': '🔎 11 Built-in Indexers (Full catalog • ad-free / zero JS)',
+      'settings_custom_sites_section': '🌐 Custom Websites (HTML / CSS / RSS / JSON)',
+      'settings_custom_sites_hint':
+          'Add any website using its normal search URL with {query} (also supports {query_plus} or {query_dash}). Pure HTTP extraction — zero browser, zero ads.',
+      'custom_site_name': 'Site name (e.g. MyTracker)',
+      'custom_site_url_label': 'Search URL template with {query}',
+      'custom_site_url_hint': 'https://example.org/search?q={query}',
+      'custom_site_2step': 'Follow detail pages (2-step mode)',
+      'custom_site_2step_sub':
+          'Enable if magnet / .torrent links only appear on each result\'s page',
+      'custom_site_advanced_css': 'Optional CSS selectors (advanced)',
+      'custom_site_row_sel': 'Row selector (e.g. table.results tbody tr)',
+      'custom_site_title_sel': 'Title selector (e.g. td.name a)',
+      'custom_site_link_sel': 'Link / magnet selector (e.g. a[href^="magnet:"])',
+      'custom_site_size_sel': 'Size selector (e.g. td.size)',
+      'custom_site_seeders_sel': 'Seeders selector (e.g. td.seeds)',
+      'custom_site_test_query': 'Test query',
+      'custom_site_test': 'Test',
+      'custom_site_testing': 'Testing...',
+      'custom_site_test_ok': '✅ {count} torrent(s) extracted successfully',
+      'custom_site_test_empty':
+          '⚠️ Page loaded (HTTP {status}) but 0 torrents detected. Try 2-step mode or CSS selectors.',
+      'custom_site_invalid_url':
+          'Enter a valid name and search URL starting with http:// or https://.',
+      'custom_site_2step_badge': '2-step',
+      'custom_site_import': 'Import JSON',
+      'custom_site_export': 'Export JSON',
+      'custom_site_exported': 'Custom websites JSON copied to clipboard.',
+      'custom_site_import_title': 'Import custom websites (JSON)',
+      'custom_site_import_hint': 'Paste a JSON list exported from Torrent Seeder...',
+      'custom_site_imported': '✅ {count} custom website(s) imported.',
+      'custom_site_invalid_json': 'Invalid JSON format or no valid custom sites found.',
+    },
+    'fr': {
+      'app_subtitle': 'Autonome • Tout le catalogue • Bac à sable actif',
+      'torrent_section_subtitle':
+          'Recherche dans tout le catalogue (films, séries, animés, musique, livres, logiciels, jeux...). Cliquez sur un titre ci-dessus ou saisissez librement.',
+      'no_torrents_any': 'Aucun torrent trouvé pour cette recherche',
+      'sources_errors_chip': '{count} source(s) indisponible(s)',
+      'sources_errors_title': 'État des sources indisponibles',
+      'settings_sources_section': '🔎 11 sources intégrées (Tout le catalogue • sans pub / zéro JS)',
+      'settings_custom_sites_section': '🌐 Sites web personnalisés (HTML / CSS / RSS / JSON)',
+      'settings_custom_sites_hint':
+          'Ajoutez n\'importe quel site via son URL de recherche normale avec {query} (supporte aussi {query_plus} et {query_dash}). Extraction HTTP pure — sans navigateur ni pub.',
+      'custom_site_name': 'Nom du site (ex : MonSite)',
+      'custom_site_url_label': 'URL de recherche avec {query}',
+      'custom_site_url_hint': 'https://exemple.org/search?q={query}',
+      'custom_site_2step': 'Suivre les pages de détail (mode 2 étapes)',
+      'custom_site_2step_sub':
+          'À activer si le lien magnet / .torrent n\'est présent que sur la fiche du résultat',
+      'custom_site_advanced_css': 'Sélecteurs CSS optionnels (avancé)',
+      'custom_site_row_sel': 'Sélecteur de ligne (ex : table.results tbody tr)',
+      'custom_site_title_sel': 'Sélecteur de titre (ex : td.name a)',
+      'custom_site_link_sel': 'Sélecteur de lien / magnet (ex : a[href^="magnet:"])',
+      'custom_site_size_sel': 'Sélecteur de taille (ex : td.size)',
+      'custom_site_seeders_sel': 'Sélecteur de seeders (ex : td.seeds)',
+      'custom_site_test_query': 'Mot-clé de test',
+      'custom_site_test': 'Tester',
+      'custom_site_testing': 'Test en cours...',
+      'custom_site_test_ok': '✅ {count} torrent(s) extrait(s) avec succès',
+      'custom_site_test_empty':
+          '⚠️ Page chargée (HTTP {status}) mais 0 torrent détecté. Essayez le mode 2 étapes ou les sélecteurs CSS.',
+      'custom_site_invalid_url':
+          'Saisissez un nom et une URL de recherche valide (http:// ou https://).',
+      'custom_site_2step_badge': '2 étapes',
+      'custom_site_import': 'Importer JSON',
+      'custom_site_export': 'Exporter JSON',
+      'custom_site_exported': 'Liste JSON des sites personnalisés copiée dans le presse-papiers.',
+      'custom_site_import_title': 'Importer des sites personnalisés (JSON)',
+      'custom_site_import_hint': 'Collez ici une liste JSON exportée depuis Torrent Seeder...',
+      'custom_site_imported': '✅ {count} site(s) personnalisé(s) importé(s).',
+      'custom_site_invalid_json': 'Format JSON invalide ou aucun site valide trouvé.',
+    },
+    'es': {
+      'app_subtitle': 'Autónomo • Catálogo completo • Sandbox Activo',
+      'torrent_section_subtitle':
+          'Búsqueda en todo el catálogo (películas, series, anime, música, libros, software, juegos...). Elige un título arriba o escribe libremente.',
+      'no_torrents_any': 'No se encontraron torrents para esta búsqueda',
+      'sources_errors_chip': '{count} fuente(s) no disponible(s)',
+      'sources_errors_title': 'Estado de las fuentes',
+      'settings_sources_section': '🔎 11 fuentes integradas (Catálogo completo • sin anuncios / cero JS)',
+      'settings_custom_sites_section': '🌐 Sitios web personalizados (HTML / CSS / RSS / JSON)',
+      'settings_custom_sites_hint':
+          'Añade cualquier sitio usando su URL de búsqueda normal con {query} (también admite {query_plus} y {query_dash}). Extracción HTTP pura sin navegador ni anuncios.',
+      'custom_site_name': 'Nombre del sitio (ej.: MiSitio)',
+      'custom_site_url_label': 'URL de búsqueda con {query}',
+      'custom_site_url_hint': 'https://ejemplo.org/search?q={query}',
+      'custom_site_2step': 'Seguir páginas de detalle (modo 2 pasos)',
+      'custom_site_2step_sub':
+          'Actívalo si el enlace magnet / .torrent solo aparece dentro de cada ficha',
+      'custom_site_advanced_css': 'Selectores CSS opcionales (avanzado)',
+      'custom_site_row_sel': 'Selector de fila (ej.: table.results tbody tr)',
+      'custom_site_title_sel': 'Selector de título (ej.: td.name a)',
+      'custom_site_link_sel': 'Selector de enlace / magnet (ej.: a[href^="magnet:"])',
+      'custom_site_size_sel': 'Selector de tamaño (ej.: td.size)',
+      'custom_site_seeders_sel': 'Selector de seeders (ej.: td.seeds)',
+      'custom_site_test_query': 'Búsqueda de prueba',
+      'custom_site_test': 'Probar',
+      'custom_site_testing': 'Probando...',
+      'custom_site_test_ok': '✅ {count} torrent(s) extraído(s) correctamente',
+      'custom_site_test_empty':
+          '⚠️ Página cargada (HTTP {status}) pero 0 torrents detectados. Prueba el modo 2 pasos o selectores CSS.',
+      'custom_site_invalid_url':
+          'Introduce un nombre y una URL de búsqueda válida (http:// o https://).',
+      'custom_site_2step_badge': '2 pasos',
+      'custom_site_import': 'Importar JSON',
+      'custom_site_export': 'Exportar JSON',
+      'custom_site_exported': 'JSON de sitios personalizados copiado al portapapeles.',
+      'custom_site_import_title': 'Importar sitios personalizados (JSON)',
+      'custom_site_import_hint': 'Pega aquí una lista JSON exportada desde Torrent Seeder...',
+      'custom_site_imported': '✅ {count} sitio(s) personalizado(s) importado(s).',
+      'custom_site_invalid_json': 'Formato JSON inválido o sin sitios válidos.',
+    },
+    'de': {
+      'app_subtitle': 'Autark • Gesamtkatalog • Sandbox Aktiv',
+      'torrent_section_subtitle':
+          'Gesamtkatalog-Suche (Filme, Serien, Anime, Musik, Bücher, Software, Spiele...). Wählen Sie oben einen Titel oder tippen Sie frei.',
+      'no_torrents_any': 'Keine Torrents für diese Suche gefunden',
+      'sources_errors_chip': '{count} Quelle(n) nicht erreichbar',
+      'sources_errors_title': 'Status nicht erreichbarer Quellen',
+      'settings_sources_section': '🔎 11 integrierte Quellen (Gesamtkatalog • werbefrei / kein JS)',
+      'settings_custom_sites_section': '🌐 Eigene Websites (HTML / CSS / RSS / JSON)',
+      'settings_custom_sites_hint':
+          'Fügen Sie jede Website über ihre normale Such-URL mit {query} hinzu (auch {query_plus} und {query_dash}). Reine HTTP-Extraktion ohne Browser oder Werbung.',
+      'custom_site_name': 'Websitename (z. B. MeineSeite)',
+      'custom_site_url_label': 'Such-URL-Vorlage mit {query}',
+      'custom_site_url_hint': 'https://beispiel.org/search?q={query}',
+      'custom_site_2step': 'Detailseiten folgen (2-Schritt-Modus)',
+      'custom_site_2step_sub':
+          'Aktivieren, wenn Magnet- / .torrent-Links erst auf der Detailseite erscheinen',
+      'custom_site_advanced_css': 'Optionale CSS-Selektoren (erweitert)',
+      'custom_site_row_sel': 'Zeilen-Selektor (z. B. table.results tbody tr)',
+      'custom_site_title_sel': 'Titel-Selektor (z. B. td.name a)',
+      'custom_site_link_sel': 'Link-/Magnet-Selektor (z. B. a[href^="magnet:"])',
+      'custom_site_size_sel': 'Größen-Selektor (z. B. td.size)',
+      'custom_site_seeders_sel': 'Seeder-Selektor (z. B. td.seeds)',
+      'custom_site_test_query': 'Test-Suchbegriff',
+      'custom_site_test': 'Testen',
+      'custom_site_testing': 'Teste...',
+      'custom_site_test_ok': '✅ {count} Torrent(s) erfolgreich extrahiert',
+      'custom_site_test_empty':
+          '⚠️ Seite geladen (HTTP {status}), aber 0 Torrents gefunden. Testen Sie den 2-Schritt-Modus oder CSS-Selektoren.',
+      'custom_site_invalid_url':
+          'Geben Sie einen gültigen Namen und eine URL mit http:// oder https:// ein.',
+      'custom_site_2step_badge': '2-Schritt',
+      'custom_site_import': 'JSON importieren',
+      'custom_site_export': 'JSON exportieren',
+      'custom_site_exported': 'JSON der eigenen Websites in die Zwischenablage kopiert.',
+      'custom_site_import_title': 'Eigene Websites importieren (JSON)',
+      'custom_site_import_hint': 'Exportierte JSON-Liste aus Torrent Seeder einfügen...',
+      'custom_site_imported': '✅ {count} eigene Website(s) importiert.',
+      'custom_site_invalid_json': 'Ungültiges JSON-Format oder keine gültigen Websites.',
+    },
+    'nl': {
+      'app_subtitle': 'Zelfstandig • Volledige catalogus • Sandbox Actief',
+      'torrent_section_subtitle':
+          'Zoeken in de volledige catalogus (films, series, anime, muziek, boeken, software, games...). Kies een titel hierboven of typ vrijuit.',
+      'no_torrents_any': 'Geen torrents gevonden voor deze zoekopdracht',
+      'sources_errors_chip': '{count} bron(nen) niet beschikbaar',
+      'sources_errors_title': 'Status van onbereikbare bronnen',
+      'settings_sources_section': '🔎 11 ingebouwde bronnen (Volledige catalogus • reclamevrij / geen JS)',
+      'settings_custom_sites_section': '🌐 Aangepaste websites (HTML / CSS / RSS / JSON)',
+      'settings_custom_sites_hint':
+          'Voeg elke website toe via de normale zoek-URL met {query} (ook {query_plus} en {query_dash}). Pure HTTP-extractie zonder browser of advertenties.',
+      'custom_site_name': 'Sitenaam (bijv. MijnSite)',
+      'custom_site_url_label': 'Zoek-URL-sjabloon met {query}',
+      'custom_site_url_hint': 'https://voorbeeld.org/search?q={query}',
+      'custom_site_2step': 'Detailpagina\'s volgen (2-stapsmodus)',
+      'custom_site_2step_sub':
+          'Inschakelen als magnet- / .torrent-links pas op de detailpagina staan',
+      'custom_site_advanced_css': 'Optionele CSS-selectors (geavanceerd)',
+      'custom_site_row_sel': 'Rij-selector (bijv. table.results tbody tr)',
+      'custom_site_title_sel': 'Titel-selector (bijv. td.name a)',
+      'custom_site_link_sel': 'Link-/magnet-selector (bijv. a[href^="magnet:"])',
+      'custom_site_size_sel': 'Grootte-selector (bijv. td.size)',
+      'custom_site_seeders_sel': 'Seeders-selector (bijv. td.seeds)',
+      'custom_site_test_query': 'Testzoekterm',
+      'custom_site_test': 'Testen',
+      'custom_site_testing': 'Testen...',
+      'custom_site_test_ok': '✅ {count} torrent(s) succesvol geëxtraheerd',
+      'custom_site_test_empty':
+          '⚠️ Pagina geladen (HTTP {status}) maar 0 torrents gevonden. Probeer 2-stapsmodus of CSS-selectors.',
+      'custom_site_invalid_url':
+          'Voer een geldige naam en zoek-URL in die begint met http:// of https://.',
+      'custom_site_2step_badge': '2-staps',
+      'custom_site_import': 'JSON importeren',
+      'custom_site_export': 'JSON exporteren',
+      'custom_site_exported': 'JSON van aangepaste websites gekopieerd naar klembord.',
+      'custom_site_import_title': 'Aangepaste websites importeren (JSON)',
+      'custom_site_import_hint': 'Plak een JSON-lijst geëxporteerd uit Torrent Seeder...',
+      'custom_site_imported': '✅ {count} aangepaste website(s) geïmporteerd.',
+      'custom_site_invalid_json': 'Ongeldig JSON-formaat of geen geldige sites gevonden.',
+    },
+    'it': {
+      'app_subtitle': 'Autonomo • Catalogo completo • Sandbox Attiva',
+      'torrent_section_subtitle':
+          'Ricerca nell\'intero catalogo (film, serie, anime, musica, libri, software, giochi...). Scegli un titolo sopra o scrivi liberamente.',
+      'no_torrents_any': 'Nessun torrent trovato per questa ricerca',
+      'sources_errors_chip': '{count} fonte/i non disponibile/i',
+      'sources_errors_title': 'Stato delle fonti non raggiungibili',
+      'settings_sources_section': '🔎 11 fonti integrate (Catalogo completo • senza pubblicità / zero JS)',
+      'settings_custom_sites_section': '🌐 Siti web personalizzati (HTML / CSS / RSS / JSON)',
+      'settings_custom_sites_hint':
+          'Aggiungi qualsiasi sito tramite il suo URL di ricerca normale con {query} (supporta anche {query_plus} e {query_dash}). Estrazione HTTP pura senza browser né pubblicità.',
+      'custom_site_name': 'Nome del sito (es. MioSito)',
+      'custom_site_url_label': 'URL di ricerca con {query}',
+      'custom_site_url_hint': 'https://esempio.org/search?q={query}',
+      'custom_site_2step': 'Segui pagine di dettaglio (modalità 2 fasi)',
+      'custom_site_2step_sub':
+          'Attiva se i link magnet / .torrent appaiono solo nella pagina del risultato',
+      'custom_site_advanced_css': 'Selettori CSS opzionali (avanzato)',
+      'custom_site_row_sel': 'Selettore riga (es. table.results tbody tr)',
+      'custom_site_title_sel': 'Selettore titolo (es. td.name a)',
+      'custom_site_link_sel': 'Selettore link / magnet (es. a[href^="magnet:"])',
+      'custom_site_size_sel': 'Selettore dimensione (es. td.size)',
+      'custom_site_seeders_sel': 'Selettore seeder (es. td.seeds)',
+      'custom_site_test_query': 'Query di test',
+      'custom_site_test': 'Testa',
+      'custom_site_testing': 'Test in corso...',
+      'custom_site_test_ok': '✅ {count} torrent estratti con successo',
+      'custom_site_test_empty':
+          '⚠️ Pagina caricata (HTTP {status}) ma 0 torrent rilevati. Prova la modalità 2 fasi o i selettori CSS.',
+      'custom_site_invalid_url':
+          'Inserisci un nome e un URL di ricerca valido (http:// o https://).',
+      'custom_site_2step_badge': '2 fasi',
+      'custom_site_import': 'Importa JSON',
+      'custom_site_export': 'Esporta JSON',
+      'custom_site_exported': 'JSON dei siti personalizzati copiato negli appunti.',
+      'custom_site_import_title': 'Importa siti personalizzati (JSON)',
+      'custom_site_import_hint': 'Incolla una lista JSON esportata da Torrent Seeder...',
+      'custom_site_imported': '✅ {count} sito/i personalizzato/i importato/i.',
+      'custom_site_invalid_json': 'Formato JSON non valido o nessun sito valido trovato.',
+    },
+  };
 
   static const Map<String, Map<String, String>> _strings = {
     // ===================================================================

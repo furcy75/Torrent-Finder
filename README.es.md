@@ -4,7 +4,7 @@
 
 # Torrent Seeder
 
-**Buscador Torrent autónomo para Películas y Series de TV con Sandbox antivirus integrado y soporte multi-cuenta Seedr.cc**
+**Buscador Torrent autónomo (catálogo completo) con extractor de sitios personalizados, Sandbox antivirus integrado y soporte multi-cuenta Seedr.cc**
 
 *100 % autónomo en Android, Windows y Linux — Sin servidor, sin publicidad, sin navegadores peligrosos, interfaz en 6 idiomas.*
 
@@ -50,7 +50,7 @@ Descarga la última versión desde [**GitHub Releases**](https://github.com/furc
 - **Búsqueda de información y Búsqueda Torrent separadas**: busca primero la ficha de Película/Serie (opcional — AlloCiné, Wikidata, TVMaze, IMDb), selecciona un título en el idioma deseado para rellenar el campo **Búsqueda Torrent** y edítalo libremente antes de buscar.
 - **Filtros rápidos, banderas en resultados y Visor NFO seguro**: seeders activos, tamaño máximo, resolución, códec (`H.264 / x264`, `x265`, `HDR`), exclusión CAM/TS por defecto, banderas vectoriales cuando se detectan idiomas en los resultados y visor NFO en texto plano.
 - **Integración Seedr.cc (una o más cuentas)**: acceso con **Email y Contraseña** (solo se guarda el token OAuth, nunca la contraseña), selector manual con **cuota libre e indicador de descarga en curso**, y **aviso discreto «Archivo descargado»** (sin detalles del archivo) al finalizar una descarga.
-- **10 fuentes integradas + Torznab**: YTS, APIBay, Knaben, TorrentCSV, SolidTorrents, EZTV, BitSearch, Nyaa, LimeTorrents, Internet Archive + Jackett/Prowlarr.
+- **11 fuentes integradas (catálogo completo) + Sitios personalizados + Torznab**: Knaben, APIBay, TorrentCSV, YTS (multi-mirror), EZTV, BitSearch, Nyaa, SubsPlease, SolidTorrents, LimeTorrents, Internet Archive (películas, series, anime, música, libros, software...), más **Sitios web personalizados** en ⚙️ Ajustes (URL con `{query}`, extracción HTML/CSS/RSS/JSON, modo 2 pasos, botón Probar, Importar/Exportar JSON) y Jackett/Prowlarr.
 
 ---
 

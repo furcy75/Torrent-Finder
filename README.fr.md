@@ -4,7 +4,7 @@
 
 # Torrent Seeder
 
-**Moteur de recherche Torrent autonome pour Films & Séries TV avec bac à sable anti-virus et intégration Seedr.cc multi-comptes**
+**Moteur de recherche Torrent autonome (tout le catalogue) avec extracteur de sites personnalisés, bac à sable anti-virus et intégration Seedr.cc multi-comptes**
 
 *100 % autonome sur Android, Windows et Linux — Zéro serveur, zéro publicité, zéro navigateur piégé, interface en 6 langues.*
 
@@ -52,7 +52,7 @@ Récupérez directement la dernière version prête à l'emploi depuis [**GitHub
 - **Recherche d'informations & Recherche Torrent séparées** : recherchez d'abord la fiche Film/Série (optionnel — AlloCiné, Wikidata, TVMaze, IMDb), cliquez sur un titre dans la langue souhaitée pour remplir le champ **Recherche Torrent**, puis modifiez librement votre requête avant de lancer la recherche.
 - **Filtres rapides, drapeaux dans les résultats & Visionneuse NFO** : seeders actifs, taille max, résolution, codec (`H.264 / x264`, `x265`, `HDR`), exclusion CAM/TS par défaut, affichage de drapeaux vectoriels lorsque les langues sont détectées dans les résultats, et NFO texte brut sécurisé.
 - **Intégration Seedr.cc (un ou plusieurs comptes)** : connexion par **Email & Mot de passe** (seul le jeton OAuth est conservé localement, jamais le mot de passe), sélecteur manuel de compte avec **quota libre + indicateur de téléchargement en cours**, et **pop-up discret « Fichier téléchargé »** (sans détail de fichier) dès qu'un transfert se termine.
-- **10 sources intégrées + Torznab** : YTS, APIBay, Knaben, TorrentCSV, SolidTorrents, EZTV, BitSearch, Nyaa, LimeTorrents, Internet Archive + Jackett/Prowlarr.
+- **11 sources intégrées (tout le catalogue) + Sites web personnalisés + Torznab** : Knaben, APIBay (NFO), TorrentCSV, YTS (multi-miroirs), EZTV, BitSearch, Nyaa, SubsPlease, SolidTorrents, LimeTorrents, Internet Archive — recherche complète sans restriction (films, séries, animés, musique, livres, logiciels, jeux...), plus **Sites web personnalisés** dans ⚙️ Paramètres (URL de recherche avec `{query}`, extraction auto HTML/RSS/JSON, sélecteurs CSS optionnels, mode 2 étapes, bouton Tester, Import/Export JSON) et Jackett/Prowlarr.
 
 ---
 

@@ -97,6 +97,13 @@ void main() {
       expect(l10n.t('dl_done_title'), isNot(equals('dl_done_title')));
       expect(l10n.t('picker_downloading_one'), isNot(equals('picker_downloading_one')));
       expect(l10n.t('donate_cta'), isNot(equals('donate_cta')));
+      expect(
+        l10n.t('settings_custom_sites_section'),
+        isNot(equals('settings_custom_sites_section')),
+      );
+      expect(l10n.t('custom_site_test'), isNot(equals('custom_site_test')));
+      expect(l10n.t('no_torrents_any'), isNot(equals('no_torrents_any')));
+      expect(l10n.t('sources_errors_chip'), isNot(equals('sources_errors_chip')));
     }
   });
 

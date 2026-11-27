@@ -4,7 +4,7 @@
 
 # Torrent Seeder
 
-**Standalone Movie & TV Series Torrent Search Engine with Built-in Anti-Malware Sandbox & Multi-Account Seedr.cc Integration**
+**Standalone Full-Catalog Torrent Search Engine with Custom Website Extractor, Anti-Malware Sandbox & Multi-Account Seedr.cc Integration**
 
 *100% standalone on Android, Windows, and Linux — Zero server, zero ads, zero trapped browsers, 6-language UI.*
 
@@ -80,7 +80,7 @@ Grab the latest ready-to-use binaries from [**GitHub Releases**](https://github.
 
 ```mermaid
 flowchart LR
-    U["Movie / Series Search"] --> I["10 Raw HTTP Indexers<br/>(JSON / RSS, zero JS)"]
+    U["Full-Catalog Search"] --> I["11 Raw HTTP Indexers + Custom Sites<br/>(JSON / RSS / HTML, zero JS)"]
     I --> R["Deduplicated Results<br/>+ Static Pre-Scan"]
     R --> W["Isolated Dart Isolate<br/>(2 MiB cap, Anti-SSRF)"]
     W --> B["Strict Bencode Decoder<br/>(Max depth 32)"]
@@ -92,10 +92,12 @@ flowchart LR
 
 ---
 
-## 🔎 Built-in Indexers (10 + Optional Torznab)
+## 🔎 11 Built-in Full-Catalog Indexers + Custom Websites + Torznab
 
-All sources can be toggled individually in **⚙️ Settings**:
-**YTS**, **APIBay** (with NFO), **Knaben**, **TorrentCSV**, **SolidTorrents**, **EZTV**, **BitSearch**, **Nyaa**, **LimeTorrents**, **Internet Archive**, plus optional **Torznab** (**Jackett** & **Prowlarr**).
+All sources search the **entire catalog** (Movies, TV Series, Anime, Music, Books, Software, Games...) and can be toggled individually in **⚙️ Settings**:
+- **11 Built-in Indexers**: **Knaben** (multi-tracker: 1337x, TPB, TGx, RuTracker, Nyaa...), **APIBay** (with full NFO), **TorrentCSV**, **YTS** (multi-mirror), **EZTV**, **BitSearch**, **Nyaa**, **SubsPlease**, **SolidTorrents**, **LimeTorrents**, **Internet Archive**.
+- **🌐 Custom Websites Extractor (Built-in)**: add any website directly in **⚙️ Settings** using its normal search URL with `{query}` (`{query_plus}`, `{query_dash}`). Supports smart HTML/RSS/JSON auto-extraction, optional Cardigann-style CSS selectors, optional 2-step detail page following, live **Test** button, and **JSON Import / Export** — pure HTTP, zero browser, zero ads.
+- **🔌 Optional Torznab**: connect **Jackett** or **Prowlarr** (full catalog).
 
 ---
 
