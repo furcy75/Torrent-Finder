@@ -177,7 +177,10 @@ class IndexersService {
             torrentUrl: item.torrentUrl ?? existing.torrentUrl,
             nfoText: item.nfoText ?? existing.nfoText,
             sourceId: item.sourceId ?? existing.sourceId,
+            publishedAt: item.publishedAt ?? existing.publishedAt,
           );
+        } else if (existing.publishedAt == null && item.publishedAt != null) {
+          deduped[key] = existing.copyWith(publishedAt: item.publishedAt);
         }
       }
     }
@@ -343,6 +346,7 @@ class IndexersService {
             magnetUrl: buildMagnet(hash, name),
             preScanStatus: preStatus,
             preScanWarnings: preWarn,
+            publishedAt: item['added']?.toString(),
           ),
         );
       }
@@ -397,6 +401,7 @@ class IndexersService {
             magnetUrl: buildMagnet(hash, name),
             preScanStatus: preStatus,
             preScanWarnings: preWarn,
+            publishedAt: item['created_unix']?.toString(),
           ),
         );
       }
@@ -551,6 +556,7 @@ class IndexersService {
 
         final cells = row.querySelectorAll('td.forum_thread_post');
         final sizeText = cells.length >= 4 ? cells[3].text.trim() : '';
+        final ageText = cells.length >= 5 ? cells[4].text.trim() : null;
         final sizeBytes = _parseHumanSizeToBytes(sizeText);
         final seedsEl = row.querySelector('td.forum_thread_post_end font, td.forum_thread_post_end');
         final seeders = int.tryParse(seedsEl?.text.replaceAll(RegExp(r'[^0-9]'), '') ?? '0') ?? 0;
@@ -579,6 +585,7 @@ class IndexersService {
             magnetUrl: magnet ?? (hash != null ? buildMagnet(hash, title) : null),
             preScanStatus: preStatus,
             preScanWarnings: preWarn,
+            publishedAt: (ageText != null && ageText.isNotEmpty) ? ageText : null,
           ),
         );
       }
@@ -631,10 +638,15 @@ class IndexersService {
           var sizeBytes = 0;
           var seeders = 0;
           var leechers = 0;
+          String? dateText;
           if (stats.length >= 4) {
             sizeBytes = _parseHumanSizeToBytes(stats[1].text.trim());
             seeders = int.tryParse(stats[2].text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
             leechers = int.tryParse(stats[3].text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+            if (stats.length >= 5) {
+              final rawD = stats[4].text.trim();
+              if (rawD.isNotEmpty) dateText = rawD;
+            }
           }
 
           final (quality, tags) = ReleaseParser.parseQuality(title);
@@ -659,6 +671,7 @@ class IndexersService {
               magnetUrl: magnet ?? (hash != null ? buildMagnet(hash, title) : null),
               preScanStatus: preStatus,
               preScanWarnings: preWarn,
+              publishedAt: dateText,
             ),
           );
         }
@@ -970,7 +983,16 @@ class IndexersService {
     final lucene = '($cleanQ) AND format:BitTorrent';
     final uri = Uri.https('archive.org', '/advancedsearch.php', {
       'q': lucene,
-      'fl[]': ['identifier', 'title', 'year', 'mediatype', 'item_size', 'downloads', 'language'],
+      'fl[]': [
+        'identifier',
+        'title',
+        'year',
+        'publicdate',
+        'mediatype',
+        'item_size',
+        'downloads',
+        'language',
+      ],
       'sort[]': 'downloads desc',
       'rows': '15',
       'page': '1',
@@ -990,6 +1012,7 @@ class IndexersService {
       if (id.isEmpty) continue;
 
       final docYear = doc['year']?.toString();
+      final publicDate = doc['publicdate']?.toString();
       final mediaKind = (doc['mediatype'] ?? '').toString().trim();
       final fullTitle = docYear != null ? '$title ($docYear)' : title;
       final sizeBytes = (doc['item_size'] as num?)?.toInt() ?? 0;
@@ -1037,7 +1060,7 @@ class IndexersService {
           torrentUrl: 'https://archive.org/download/$id/${id}_archive.torrent',
           preScanStatus: preStatus,
           preScanWarnings: preWarn,
-          publishedAt: docYear,
+          publishedAt: (publicDate != null && publicDate.isNotEmpty) ? publicDate : docYear,
         ),
       );
     }
@@ -1130,6 +1153,7 @@ class IndexersService {
             magnetUrl: magnet,
             preScanStatus: preStatus,
             preScanWarnings: preWarn,
+            publishedAt: item.getElement('pubDate')?.innerText.trim(),
           ),
         );
       }

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:safetorrent/models/app_settings.dart';
 import 'package:safetorrent/services/custom_site_service.dart';
 import 'package:safetorrent/services/local_storage.dart';
+import 'package:safetorrent/services/release_parser.dart';
 
 void main() {
   final service = CustomSiteService();
@@ -294,6 +295,43 @@ void main() {
       expect(reloaded.settings.customSites.length, equals(1));
       expect(reloaded.settings.customSites.first.name, equals('OpenIndex'));
       expect(reloaded.settings.customSites.first.followDetailPages, isTrue);
+    });
+  });
+
+  group('ReleaseParser.parsePublishedDate & formatPublishedDate', () {
+    test('parses ISO, Unix timestamps, RFC 2822, English text, slash, relative ages, and year', () {
+      final ref = DateTime.utc(2025, 11, 20, 12, 0);
+
+      expect(
+        ReleaseParser.formatPublishedDate('2025-03-14T18:22:00+00:00'),
+        equals('2025-03-14'),
+      );
+      expect(
+        ReleaseParser.formatPublishedDate('1731542400'), // 2024-11-14 UTC
+        equals('2024-11-14'),
+      );
+      expect(
+        ReleaseParser.formatPublishedDate('Thu, 14 Nov 2024 18:00:00 -0000'),
+        equals('2024-11-14'),
+      );
+      expect(
+        ReleaseParser.formatPublishedDate('Nov 12, 2024'),
+        equals('2024-11-12'),
+      );
+      expect(
+        ReleaseParser.formatPublishedDate('11/24/25'),
+        equals('2025-11-24'),
+      );
+      expect(
+        ReleaseParser.formatPublishedDate('3d 2h', now: ref),
+        equals('2025-11-17'),
+      );
+      expect(
+        ReleaseParser.formatPublishedDate('2023'),
+        equals('2023-01-01'),
+      );
+      expect(ReleaseParser.parsePublishedDate(''), isNull);
+      expect(ReleaseParser.parsePublishedDate(null), isNull);
     });
   });
 }

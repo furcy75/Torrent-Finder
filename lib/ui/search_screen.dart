@@ -15,7 +15,7 @@ import 'package:safetorrent/ui/sandbox_dialog.dart';
 import 'package:safetorrent/ui/seedr_picker_dialog.dart';
 import 'package:safetorrent/ui/widgets/country_flag.dart';
 
-enum _SortMode { seeders, quality, sizeDesc, sizeAsc }
+enum _SortMode { seeders, dateDesc, dateAsc, quality, sizeDesc, sizeAsc }
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({
@@ -428,9 +428,21 @@ class _SearchScreenState extends State<SearchScreen> {
 
   List<TorrentResult> get _filteredAndSortedResults {
     final list = _results.where(_matchesTagFilters).toList();
+    int compareDates(TorrentResult a, TorrentResult b, {required bool descending}) {
+      final da = ReleaseParser.parsePublishedDate(a.publishedAt);
+      final db = ReleaseParser.parsePublishedDate(b.publishedAt);
+      if (da == null && db == null) return b.seeders.compareTo(a.seeders);
+      if (da == null) return 1;
+      if (db == null) return -1;
+      final cmp = descending ? db.compareTo(da) : da.compareTo(db);
+      return cmp != 0 ? cmp : b.seeders.compareTo(a.seeders);
+    }
+
     list.sort((a, b) {
       return switch (_sortMode) {
         _SortMode.seeders => b.seeders.compareTo(a.seeders),
+        _SortMode.dateDesc => compareDates(a, b, descending: true),
+        _SortMode.dateAsc => compareDates(a, b, descending: false),
         _SortMode.quality =>
           ReleaseParser.qualityRank(b.quality).compareTo(ReleaseParser.qualityRank(a.quality)),
         _SortMode.sizeDesc => b.sizeBytes.compareTo(a.sizeBytes),
@@ -907,6 +919,14 @@ class _SearchScreenState extends State<SearchScreen> {
                           DropdownMenuItem(
                             value: _SortMode.seeders,
                             child: Text(l10n.t('sort_seeders')),
+                          ),
+                          DropdownMenuItem(
+                            value: _SortMode.dateDesc,
+                            child: Text(l10n.t('sort_date_desc')),
+                          ),
+                          DropdownMenuItem(
+                            value: _SortMode.dateAsc,
+                            child: Text(l10n.t('sort_date_asc')),
                           ),
                           DropdownMenuItem(
                             value: _SortMode.quality,
@@ -1561,6 +1581,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildResultCard(AppL10n l10n, TorrentResult item) {
     final isBlocked = item.preScanStatus == SafetyStatus.blocked;
     final is4k = item.quality.toLowerCase().contains('4k') || item.quality.contains('2160p');
+    final formattedDate = ReleaseParser.formatPublishedDate(item.publishedAt);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1632,6 +1653,14 @@ class _SearchScreenState extends State<SearchScreen> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
+                if (formattedDate != null)
+                  Text(
+                    '📅 $formattedDate',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
               ],
             ),
             if (item.preScanWarnings.isNotEmpty) ...[

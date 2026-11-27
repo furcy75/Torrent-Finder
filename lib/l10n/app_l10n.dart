@@ -68,9 +68,11 @@ class AppL10n {
     return value;
   }
 
-  /// v2.1.0 additions & full-catalog wording overrides across all 6 languages.
+  /// v2.1.x additions & full-catalog wording overrides across all 6 languages.
   static const Map<String, Map<String, String>> _extraStrings = {
     'en': {
+      'sort_date_desc': 'Sort: Date ↓ (newest)',
+      'sort_date_asc': 'Sort: Date ↑ (oldest)',
       'app_subtitle': 'Standalone • Full Catalog • Sandbox Active',
       'torrent_section_subtitle':
           'Full-catalog search (movies, series, anime, music, books, software, games...). Pick a title above or type freely below.',
@@ -111,6 +113,8 @@ class AppL10n {
       'custom_site_invalid_json': 'Invalid JSON format or no valid custom sites found.',
     },
     'fr': {
+      'sort_date_desc': 'Tri : Date ↓ (récent)',
+      'sort_date_asc': 'Tri : Date ↑ (ancien)',
       'app_subtitle': 'Autonome • Tout le catalogue • Bac à sable actif',
       'torrent_section_subtitle':
           'Recherche dans tout le catalogue (films, séries, animés, musique, livres, logiciels, jeux...). Cliquez sur un titre ci-dessus ou saisissez librement.',
@@ -151,6 +155,8 @@ class AppL10n {
       'custom_site_invalid_json': 'Format JSON invalide ou aucun site valide trouvé.',
     },
     'es': {
+      'sort_date_desc': 'Orden: Fecha ↓ (reciente)',
+      'sort_date_asc': 'Orden: Fecha ↑ (antiguo)',
       'app_subtitle': 'Autónomo • Catálogo completo • Sandbox Activo',
       'torrent_section_subtitle':
           'Búsqueda en todo el catálogo (películas, series, anime, música, libros, software, juegos...). Elige un título arriba o escribe libremente.',
@@ -191,6 +197,8 @@ class AppL10n {
       'custom_site_invalid_json': 'Formato JSON inválido o sin sitios válidos.',
     },
     'de': {
+      'sort_date_desc': 'Sortierung: Datum ↓ (neu)',
+      'sort_date_asc': 'Sortierung: Datum ↑ (alt)',
       'app_subtitle': 'Autark • Gesamtkatalog • Sandbox Aktiv',
       'torrent_section_subtitle':
           'Gesamtkatalog-Suche (Filme, Serien, Anime, Musik, Bücher, Software, Spiele...). Wählen Sie oben einen Titel oder tippen Sie frei.',
@@ -231,6 +239,8 @@ class AppL10n {
       'custom_site_invalid_json': 'Ungültiges JSON-Format oder keine gültigen Websites.',
     },
     'nl': {
+      'sort_date_desc': 'Sorteren: Datum ↓ (nieuw)',
+      'sort_date_asc': 'Sorteren: Datum ↑ (oud)',
       'app_subtitle': 'Zelfstandig • Volledige catalogus • Sandbox Actief',
       'torrent_section_subtitle':
           'Zoeken in de volledige catalogus (films, series, anime, muziek, boeken, software, games...). Kies een titel hierboven of typ vrijuit.',
@@ -271,6 +281,8 @@ class AppL10n {
       'custom_site_invalid_json': 'Ongeldig JSON-formaat of geen geldige sites gevonden.',
     },
     'it': {
+      'sort_date_desc': 'Ordina: Data ↓ (recenti)',
+      'sort_date_asc': 'Ordina: Data ↑ (meno recenti)',
       'app_subtitle': 'Autonomo • Catalogo completo • Sandbox Attiva',
       'torrent_section_subtitle':
           'Ricerca nell\'intero catalogo (film, serie, anime, musica, libri, software, giochi...). Scegli un titolo sopra o scrivi liberamente.',

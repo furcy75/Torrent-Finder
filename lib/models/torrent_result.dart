@@ -99,6 +99,7 @@ class TorrentResult {
     String? torrentUrl,
     String? nfoText,
     String? sourceId,
+    String? publishedAt,
   }) {
     return TorrentResult(
       id: id,
@@ -119,7 +120,7 @@ class TorrentResult {
       magnetUrl: magnetUrl,
       preScanStatus: preScanStatus,
       preScanWarnings: preScanWarnings,
-      publishedAt: publishedAt,
+      publishedAt: publishedAt ?? this.publishedAt,
     );
   }
 }

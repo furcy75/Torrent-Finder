@@ -511,6 +511,8 @@ class CustomSiteService {
             infoHash: hash,
             torrentUrl: torrentUrl,
             magnetUrl: magnet,
+            publishedAt: item.getElement('pubDate')?.innerText.trim() ??
+                item.getElement('published')?.innerText.trim(),
           ),
         );
       }
@@ -567,6 +569,13 @@ class CustomSiteService {
         final seeders = int.tryParse((raw['seeders'] ?? raw['seeds'] ?? '0').toString()) ?? 0;
         final leechers =
             int.tryParse((raw['leechers'] ?? raw['peers'] ?? '0').toString()) ?? 0;
+        final publishedAt = (raw['date'] ??
+                raw['created_unix'] ??
+                raw['added'] ??
+                raw['uploaded'] ??
+                raw['pubDate'] ??
+                raw['publishedAt'])
+            ?.toString();
 
         out.add(
           _buildResult(
@@ -578,6 +587,7 @@ class CustomSiteService {
             infoHash: validHash,
             torrentUrl: torrentUrl,
             magnetUrl: magnet,
+            publishedAt: publishedAt,
           ),
         );
       }
@@ -596,6 +606,7 @@ class CustomSiteService {
     String? infoHash,
     String? torrentUrl,
     String? magnetUrl,
+    String? publishedAt,
   }) {
     final (quality, tags) = ReleaseParser.parseQuality(title);
     final langs = ReleaseParser.detectLanguages(title);
@@ -619,6 +630,7 @@ class CustomSiteService {
       magnetUrl: magnetUrl,
       preScanStatus: preStatus,
       preScanWarnings: preWarn,
+      publishedAt: publishedAt,
     );
   }
 

@@ -104,6 +104,8 @@ void main() {
       expect(l10n.t('custom_site_test'), isNot(equals('custom_site_test')));
       expect(l10n.t('no_torrents_any'), isNot(equals('no_torrents_any')));
       expect(l10n.t('sources_errors_chip'), isNot(equals('sources_errors_chip')));
+      expect(l10n.t('sort_date_desc'), isNot(equals('sort_date_desc')));
+      expect(l10n.t('sort_date_asc'), isNot(equals('sort_date_asc')));
     }
   });
 

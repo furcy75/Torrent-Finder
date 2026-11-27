@@ -2,7 +2,7 @@
 [Setup]
 AppId={{8D6B4A7E-9A51-4D8C-B9B5-4C7D29D7A101}
 AppName=Torrent Seeder
-AppVersion=2.1.0
+AppVersion=2.1.1
 AppPublisher=Torrent Seeder
 DefaultDirName={autopf}\Torrent Seeder
 DefaultGroupName=Torrent Seeder
